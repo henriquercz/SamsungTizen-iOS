@@ -24,7 +24,7 @@ enum MediaHTTP {
         let fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         guard fd >= 0 else { throw RemoteError.message("Wi-Fi is unavailable.") }
         defer { Darwin.close(fd) }
-        var target = sockaddr_in(); target.sin_len = UInt8(MemoryLayout<sockaddr_in>.size); target.sin_family = sa_family_t(AF_INET); target.sin_port = UInt16(1719).bigEndian
+        var target = sockaddr_in(); target.sin_len = UInt8(MemoryLayout<sockaddr_in>.size); target.sin_family = sa_family_t(AF_INET); target.sin_port = UInt16(9197).bigEndian
         guard inet_pton(AF_INET, host, &target.sin_addr) == 1 else { throw RemoteError.message("Invalid IP address.") }
         let result = withUnsafePointer(to: &target) { p in p.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) } }
         guard result == 0 else { throw RemoteError.message("There is no network route to the TV.") }
@@ -43,7 +43,7 @@ final class MediaFileServer: @unchecked Sendable {
     let mime: String
     let token = "/" + UUID().uuidString + "/media"
     private let allowedHost: String
-    private let queue = DispatchQueue(label: "br.local.LGRemote.media")
+    private let queue = DispatchQueue(label: "br.local.TizenRemote.media")
     private var listener: NWListener?
     private var connections: [UUID: NWConnection] = [:]
     init(file: URL, allowedHost: String) {
@@ -121,7 +121,9 @@ final class MediaFileServer: @unchecked Sendable {
         guard let range = try? MediaHTTP.range(rangeHeader, size: size) else { try? handle.close(); fail(connection, status: "416 Range Not Satisfiable", extra: "Content-Range: bytes */\(size)\r\n"); return }
         let count = range.end - range.start + 1
         let status = range.partial ? "206 Partial Content" : "200 OK"
-        var response = "HTTP/1.1 \(status)\r\nContent-Type: \(mime)\r\nContent-Length: \(count)\r\nAccept-Ranges: bytes\r\nConnection: close\r\ntransferMode.dlna.org: Streaming\r\n"
+        var response = "HTTP/1.1 \(status)\r\nContent-Type: \(mime)\r\nContent-Length: \(count)\r\nAccept-Ranges: bytes\r\nConnection: close\r\n"
+        // Samsung renderers check the DLNA headers before they accept a URL.
+        response += "transferMode.dlna.org: \(mime.hasPrefix("image/") ? "Interactive" : "Streaming")\r\ncontentFeatures.dlna.org: \(UPnPRenderer.dlnaFeatures)\r\n"
         if range.partial { response += "Content-Range: bytes \(range.start)-\(range.end)/\(size)\r\n" }
         response += "\r\n"
         try? handle.seek(toOffset: range.start)
@@ -139,8 +141,8 @@ final class MediaFileServer: @unchecked Sendable {
     }
 }
 
-private final class TransportXML: NSObject, XMLParserDelegate {
-    var path: String?
+private final class RendererXML: NSObject, XMLParserDelegate {
+    var controls: [String: String] = [:]
     private var inside = false
     private var element = ""
     private var values: [String: String] = [:]
@@ -149,41 +151,97 @@ private final class TransportXML: NSObject, XMLParserDelegate {
     }
     func parser(_ parser: XMLParser, foundCharacters string: String) { if inside { values[element, default: ""] += string } }
     func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) {
-        if name == "service" { if values["serviceType"]?.contains(":AVTransport:") == true { path = values["controlURL"]?.trimmingCharacters(in: .whitespacesAndNewlines) }; inside = false }; element = ""
+        if name == "service", let type = values["serviceType"]?.trimmingCharacters(in: .whitespacesAndNewlines), let path = values["controlURL"] {
+            controls[type] = path.trimmingCharacters(in: .whitespacesAndNewlines); inside = false
+        }
+        element = ""
     }
 }
+private final class ValueXML: NSObject, XMLParserDelegate {
+    let wanted: String
+    var value: String?
+    private var current = ""
+    init(_ wanted: String) { self.wanted = wanted }
+    func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String]) { current = name }
+    func parser(_ parser: XMLParser, foundCharacters string: String) { if current == wanted { value = (value ?? "") + string } }
+    func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) { current = "" }
+}
 
-enum DLNATransport {
-    static let urn = "urn:schemas-upnp-org:service:AVTransport:1"
-    static func discover(host: String) async throws -> URL {
-        guard WebOSConnection.validHost(host), let url = URL(string: "http://\(host):1719/") else { throw RemoteError.message("Invalid IP address.") }
+/// The TV's DLNA renderer: AVTransport plays a file from this Mac; RenderingControl reads and sets volume.
+struct UPnPRenderer: Equatable {
+    static let transport = "urn:schemas-upnp-org:service:AVTransport:1"
+    static let rendering = "urn:schemas-upnp-org:service:RenderingControl:1"
+    static let dlnaFeatures = "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000"
+    let transportURL: URL?
+    let renderingURL: URL?
+    /// Samsung renderers serve their description on port 9197.
+    static func discover(host: String) async throws -> UPnPRenderer {
+        guard TizenConnection.validHost(host), let url = URL(string: "http://\(host):9197/dmr") else { throw RemoteError.message("Invalid IP address.") }
         var request = URLRequest(url: url); request.timeoutInterval = 6
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw RemoteError.message("The TV's media service did not respond.") }
-        let parser = XMLParser(data: data), delegate = TransportXML(); parser.delegate = delegate
-        guard parser.parse(), let path = delegate.path, let control = URL(string: path, relativeTo: url)?.absoluteURL,
-              control.host == host, control.scheme == "http", control.port == 1719 else { throw RemoteError.message("No compatible media service was found on this TV.") }
-        return control
+        guard (response as? HTTPURLResponse)?.statusCode == 200, data.count <= 1_048_576 else { throw RemoteError.message("The TV's media service did not respond.") }
+        let parser = XMLParser(data: data), delegate = RendererXML(); parser.delegate = delegate
+        parser.shouldResolveExternalEntities = false
+        guard parser.parse() else { throw RemoteError.message("No compatible media service was found on this TV.") }
+        func control(_ type: String) -> URL? {
+            guard let path = delegate.controls[type], let control = URL(string: path, relativeTo: url)?.absoluteURL,
+                  control.host == host, control.scheme == "http", control.port == 9197 else { return nil }
+            return control
+        }
+        let renderer = UPnPRenderer(transportURL: control(transport), renderingURL: control(rendering))
+        guard renderer.transportURL != nil || renderer.renderingURL != nil else { throw RemoteError.message("No compatible media service was found on this TV.") }
+        return renderer
     }
     static func escape(_ text: String) -> String {
         text.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;").replacingOccurrences(of: "'", with: "&apos;")
     }
     static func metadata(url: URL, title: String, mime: String) -> String {
         let type = mime.hasPrefix("image/") ? "imageItem.photo" : mime.hasPrefix("audio/") ? "audioItem.musicTrack" : "videoItem"
-        return "<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\"><item id=\"0\" parentID=\"-1\" restricted=\"1\"><dc:title>\(escape(title))</dc:title><upnp:class>object.item.\(type)</upnp:class><res protocolInfo=\"http-get:*:\(escape(mime)):*\">\(escape(url.absoluteString))</res></item></DIDL-Lite>"
+        return "<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\"><item id=\"0\" parentID=\"-1\" restricted=\"1\"><dc:title>\(escape(title))</dc:title><upnp:class>object.item.\(type)</upnp:class><res protocolInfo=\"http-get:*:\(escape(mime)):\(dlnaFeatures)\">\(escape(url.absoluteString))</res></item></DIDL-Lite>"
     }
-    static func envelope(action: String, parameters: [(String, String)]) -> String {
+    static func envelope(service: String, action: String, parameters: [(String, String)]) -> String {
         let arguments = ([("InstanceID", "0")] + parameters).map { "<\($0.0)>\(escape($0.1))</\($0.0)>" }.joined()
-        return "<?xml version=\"1.0\" encoding=\"utf-8\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:\(action) xmlns:u=\"\(urn)\">\(arguments)</u:\(action)></s:Body></s:Envelope>"
+        return "<?xml version=\"1.0\" encoding=\"utf-8\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:\(action) xmlns:u=\"\(service)\">\(arguments)</u:\(action)></s:Body></s:Envelope>"
     }
-    static func command(_ url: URL, action: String, parameters: [(String, String)] = []) async throws -> String {
+    static func value(_ element: String, in response: String) -> String? {
+        let parser = XMLParser(data: Data(response.utf8)), delegate = ValueXML(element); parser.delegate = delegate
+        parser.shouldResolveExternalEntities = false
+        return parser.parse() ? delegate.value?.trimmingCharacters(in: .whitespacesAndNewlines) : nil
+    }
+    static func command(_ url: URL, service: String, action: String, parameters: [(String, String)] = []) async throws -> String {
         var request = URLRequest(url: url); request.httpMethod = "POST"; request.timeoutInterval = 10
         request.setValue("text/xml; charset=\"utf-8\"", forHTTPHeaderField: "Content-Type")
-        request.setValue("\"\(urn)#\(action)\"", forHTTPHeaderField: "SOAPAction")
-        request.httpBody = Data(envelope(action: action, parameters: parameters).utf8)
+        request.setValue("\"\(service)#\(action)\"", forHTTPHeaderField: "SOAPAction")
+        request.httpBody = Data(envelope(service: service, action: action, parameters: parameters).utf8)
         let (data, response) = try await URLSession.shared.data(for: request)
         let text = String(decoding: data, as: UTF8.self)
-        guard (response as? HTTPURLResponse)?.statusCode == 200, !text.contains("Fault>") else { throw RemoteError.message("The TV rejected \(action). Check the file format and connection.") }
+        guard (response as? HTTPURLResponse)?.statusCode == 200, !text.contains("Fault>") else {
+            throw RemoteError.message(service == transport ? "The TV rejected \(action). Check the file format and connection." : "The TV rejected the volume change. Its audio may be on an external speaker.")
+        }
         return text
+    }
+    func play(_ media: URL, title: String, mime: String) async throws {
+        guard let transportURL else { throw RemoteError.message("No compatible media service was found on this TV.") }
+        _ = try await Self.command(transportURL, service: Self.transport, action: "SetAVTransportURI", parameters: [("CurrentURI", media.absoluteString), ("CurrentURIMetaData", Self.metadata(url: media, title: title, mime: mime))])
+        _ = try await Self.command(transportURL, service: Self.transport, action: "Play", parameters: [("Speed", "1")])
+    }
+    func transport(_ action: String) async throws {
+        guard let transportURL else { throw RemoteError.message("No compatible media service was found on this TV.") }
+        _ = try await Self.command(transportURL, service: Self.transport, action: action, parameters: action == "Play" ? [("Speed", "1")] : [])
+    }
+    func volume() async throws -> (level: Int, muted: Bool) {
+        guard let renderingURL else { throw RemoteError.message("This TV does not report its volume.") }
+        let level = try await Self.command(renderingURL, service: Self.rendering, action: "GetVolume", parameters: [("Channel", "Master")])
+        let mute = try await Self.command(renderingURL, service: Self.rendering, action: "GetMute", parameters: [("Channel", "Master")])
+        guard let value = Self.value("CurrentVolume", in: level).flatMap(Int.init) else { throw RemoteError.message("This TV does not report its volume.") }
+        return (value, Self.value("CurrentMute", in: mute) == "1")
+    }
+    func setVolume(_ level: Int) async throws {
+        guard let renderingURL else { throw RemoteError.message("This TV does not report its volume.") }
+        _ = try await Self.command(renderingURL, service: Self.rendering, action: "SetVolume", parameters: [("Channel", "Master"), ("DesiredVolume", String(min(100, max(0, level))))])
+    }
+    func setMute(_ muted: Bool) async throws {
+        guard let renderingURL else { throw RemoteError.message("This TV does not report its volume.") }
+        _ = try await Self.command(renderingURL, service: Self.rendering, action: "SetMute", parameters: [("Channel", "Master"), ("DesiredMute", muted ? "1" : "0")])
     }
 }

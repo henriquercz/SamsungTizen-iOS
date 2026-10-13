@@ -1,9 +1,9 @@
 import Foundation
 import Security
 
-enum PairingKey {
+enum PairingToken {
     static func query(_ host: String) -> [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "br.local.LGRemote", kSecAttrAccount as String: host]
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "br.local.TizenRemote", kSecAttrAccount as String: host]
     }
     static func read(_ host: String) -> String? {
         var q = query(host); q[kSecReturnData as String] = true; q[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -17,14 +17,14 @@ enum PairingKey {
         if status == errSecItemNotFound {
             var insert = q; insert[kSecValueData as String] = data
             insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            guard SecItemAdd(insert as CFDictionary, nil) == errSecSuccess else { throw RemoteError.message("Could not save TV pairing in Keychain.") }
-        } else if status != errSecSuccess { throw RemoteError.message("Keychain refused the pairing key (\(status)).") }
+            guard SecItemAdd(insert as CFDictionary, nil) == errSecSuccess else { throw RemoteError.message("Could not save the TV pairing in Keychain.") }
+        } else if status != errSecSuccess { throw RemoteError.message("Keychain refused the pairing token (\(status)).") }
     }
     static func delete(_ host: String) throws {
         let status = SecItemDelete(query(host) as CFDictionary)
         var failures: [String] = []
         if status != errSecSuccess && status != errSecItemNotFound {
-            failures.append("Keychain refused to remove the pairing key (\(status)).")
+            failures.append("Keychain refused to remove the pairing token (\(status)).")
         }
         // Attempt both removals even if one fails, then report any remaining item.
         do { try TVCertificatePin.delete(host) }
@@ -33,12 +33,12 @@ enum PairingKey {
     }
 }
 
-// Pins are private to this Mac and TV, just like the SSAP pairing key. They are
+// Pins are private to this Mac and TV, just like the Smart View pairing token. They are
 // never bundled with the app or written into a diagnostic/exported report.
 enum TVCertificatePin {
     private static func query(_ host: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: "br.local.LGRemote.Certificate",
+         kSecAttrService as String: "br.local.TizenRemote.Certificate",
          kSecAttrAccount as String: host]
     }
     static func read(_ host: String) -> String? {

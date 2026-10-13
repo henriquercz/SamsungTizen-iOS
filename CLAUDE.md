@@ -1,6 +1,6 @@
-# LGwebOS-menubar: setup guide for Claude
+# SamsungTizen-menubar: setup guide for Claude
 
-This is a native macOS menu bar app that controls an LG TV running webOS. When a user asks you to set it up, follow these steps in order. Ask the user for anything you cannot find yourself. Do not guess an IP address, MAC address, or TV model.
+This is a native macOS menu bar app that controls a Samsung TV running Tizen. It is a fork of LGwebOS-menubar. When a user asks you to set it up, follow these steps in order. Ask the user for anything you cannot find yourself. Do not guess an IP address, MAC address, or TV model.
 
 ## 1. Check the Mac
 
@@ -13,54 +13,46 @@ This is a native macOS menu bar app that controls an LG TV running webOS. When a
 bash scripts/build.sh
 ```
 
-The output is `dist/LGwebOS-menubar.app`. Do not commit the `dist/` folder.
+The output is `dist/SamsungTizen-menubar.app`. Do not commit the `dist/` folder. If the user has a code signing identity (`security find-identity -v -p codesigning`), offer to build with `SIGN_IDENTITY="<name>"`, so macOS keeps Keychain and Local Network approvals across rebuilds.
 
-## 3. Collect the TV details
+## 3. Find the TV
 
-Ask the user for these:
+The TV describes itself without pairing. With its IPv4 address:
 
-1. **Model number.** It is on the TV's info screen and on the label on the back.
-2. **IPv4 address.** The app can discover the TV, or the user can read it from their router's device list. It looks like `192.168.x.x`. Hostnames and IPv6 are not supported.
-3. **MAC address** (only needed for Wake-on-LAN).
+```sh
+curl -s http://TV_IP:8001/api/v2/
+```
+
+The answer has the name, model (`modelName`), model year (first two digits of `model`), power state, and Wi-Fi MAC address. If you do not know the address, the app's **Find TVs on your network** searches for it, or the user can read it from their router's device list. Hostnames and IPv6 are not supported.
 
 ## 4. Check compatibility
 
-- The app has been tested with webOS 5.0 on one LG TV. Other models and versions are unverified.
-- If the user's TV has a different model or version, explain the compatibility status before continuing. If they try it, report the result and suggest an issue with the model number and exact webOS version.
+- The app has been tested on one 2020 Samsung TV (Tizen 5.5). Other models and years are unverified.
+- TVs from 2020 on do not list installed apps; the app falls back to its catalog. Older TVs send their list.
+- If the user's TV is different, explain the compatibility status before continuing. If they try it, report the result and suggest an issue with the model number and year.
 
-## 5. Check the TV is reachable
-
-From the Mac:
-
-```sh
-ping -c 3 TV_IP
-```
-
-If there is no reply, check that the TV and Mac are on the same network. Some guest networks and networks with device isolation block discovery. The user can still enter the IP manually in the app.
-
-## 6. Run the offline checks
+## 5. Run the offline checks
 
 ```sh
-"dist/LGwebOS-menubar.app/Contents/MacOS/LGwebOSMenubar" --self-check
+"dist/SamsungTizen-menubar.app/Contents/MacOS/TizenMenubar" --self-check
 python3 scripts/privacy-check.py
 ```
 
 Both should pass before you go further.
 
-## 7. Connect and pair
+## 6. Connect and pair
 
-Open the app: `open "dist/LGwebOS-menubar.app"`. Then the user does this in the app:
+Open the app: `open "dist/SamsungTizen-menubar.app"`. Then the user does this in the app:
 
 1. Open Settings.
 2. Choose **Find TVs on your network**, or enter the IPv4 address.
-3. Optionally enter a display name and the MAC address.
-4. Choose **Save and connect**, approve the certificate prompt, then accept pairing on the TV.
+3. Choose **Save and connect** and approve the certificate prompt.
+4. Choose **Allow** on the TV with the TV remote.
 
-A request appears on the TV, and the user must accept it on the TV itself. You cannot do that step for them.
+You cannot do the last step for them. If macOS asks for Local Network access, the user must allow it.
 
 ## Rules while setting up
 
-- Never write the user's IP address, MAC address, serial number, or pairing key into a tracked file. Keep them in the app's settings or in `.local/`, which is ignored by git.
-- Never commit or push without the user's explicit approval.
-- Do not change the webOS compatibility notes in the README unless the user has tested a new version and asks you to.
-- If something fails, report the exact error and what you ruled out. Do not retry the same pairing request repeatedly, because the TV may lock out repeated attempts.
+- Never write the user's IP address, MAC address, serial number, or pairing token into a tracked file. Keep them in the app's settings or in `.local/`, which is ignored by git.
+- Do not change the compatibility notes in the README unless the user has tested a new TV and asks you to.
+- If something fails, report the exact error and what you ruled out. Do not send pairing requests repeatedly; a TV that was denied must be removed from its Device Connection Manager list before it asks again.
