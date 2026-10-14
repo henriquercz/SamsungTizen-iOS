@@ -220,6 +220,27 @@ struct RemoteView: View {
     // MARK: - Floating Liquid Glass Header (Top Navbar)
     private var floatingHeader: some View {
         HStack(spacing: 12) {
+            // App Logo in subtle liquid glass container
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 36, height: 36)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.24), .white.opacity(0.06)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.8
+                            )
+                    )
+                    .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
+                BrandImage(name: "logo", width: 28, height: 28)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            }
+
             // Brand & Name
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
