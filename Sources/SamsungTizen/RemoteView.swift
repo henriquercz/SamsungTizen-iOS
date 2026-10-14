@@ -91,14 +91,15 @@ struct AppMark: View {
 
 private struct BrandImage: View {
     let name: String
-    var width: CGFloat = 28
-    var height: CGFloat = 28
+    var width: CGFloat? = 28
+    var height: CGFloat? = 28
+    var contentMode: ContentMode = .fit
     var body: some View {
         Group {
             if let url = AppResources.bundle.url(forResource: name, withExtension: "png", subdirectory: "AppAssets"),
                let data = try? Data(contentsOf: url),
                let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage).resizable().interpolation(.high).scaledToFit()
+                Image(uiImage: uiImage).resizable().interpolation(.high).aspectRatio(contentMode: contentMode)
             }
         }
         .frame(width: width, height: height)
@@ -181,8 +182,8 @@ struct RemoteView: View {
             VStack {
                 Spacer()
                 floatingTabBar
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 10)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 8)
             }
         }
         .preferredColorScheme(.dark)
@@ -492,7 +493,7 @@ struct RemoteView: View {
 
     // MARK: - Floating Liquid Glass Tab Bar (Bottom Dock)
     private var floatingTabBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             ForEach(RemoteTab.allCases) { item in
                 let isSelected = tab == item && !settings
                 Button {
@@ -610,10 +611,12 @@ struct RemoteView: View {
                 ZStack {
                     Ellipse()
                         .fill(accent.opacity(store.connected ? 0.35 : 0.08))
-                        .frame(width: 240, height: 110)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 110)
                         .blur(radius: 36)
 
-                    BrandImage(name: "tv-hero", width: 280, height: 155)
+                    BrandImage(name: "tv-hero", width: nil, height: 155)
+                        .frame(maxWidth: .infinity)
 
                     VStack(spacing: 8) {
                         if isPlayStation { BrandImage(name: "playstation", width: 44, height: 44) }
@@ -631,6 +634,7 @@ struct RemoteView: View {
                     .shadow(color: accent.opacity(0.6), radius: 14)
                 }
                 .frame(height: 160)
+                .frame(maxWidth: .infinity)
 
                 HStack {
                     Circle().fill(store.connected ? accent : mutedInk).frame(width: 6, height: 6)
@@ -715,7 +719,7 @@ struct RemoteView: View {
         }
     }
 
-    // MARK: - Remote Panel (Full D-Pad and Controls)
+    // MARK: - Remote Panel (Full Tactile Remote)
     private var remotePanel: some View {
         VStack(spacing: 14) {
             GlassCard {
@@ -731,8 +735,8 @@ struct RemoteView: View {
                     }
 
                     // D-Pad and Core Action cluster
-                    HStack(spacing: 16) {
-                        VStack(spacing: 16) {
+                    HStack(spacing: 14) {
+                        VStack(spacing: 20) {
                             remoteIconButton("house.fill", "KEY_HOME", label: "Início")
                             remoteIconButton("arrow.uturn.backward", "KEY_RETURN", label: "Voltar")
                         }
@@ -741,21 +745,31 @@ struct RemoteView: View {
                         ZStack {
                             Circle()
                                 .fill(Color.white.opacity(0.06))
-                                .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8))
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(
+                                            LinearGradient(
+                                                colors: [.white.opacity(0.25), .white.opacity(0.06)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1
+                                        )
+                                )
 
                             VStack {
                                 dpadDirection("chevron.up", "KEY_UP", label: "Para cima")
                                 Spacer()
                                 dpadDirection("chevron.down", "KEY_DOWN", label: "Para baixo")
                             }
-                            .padding(8)
+                            .padding(10)
 
                             HStack {
                                 dpadDirection("chevron.left", "KEY_LEFT", label: "Para a esquerda")
                                 Spacer()
                                 dpadDirection("chevron.right", "KEY_RIGHT", label: "Para a direita")
                             }
-                            .padding(8)
+                            .padding(10)
 
                             // Center OK Button
                             Button {
@@ -763,35 +777,34 @@ struct RemoteView: View {
                                 store.press("KEY_ENTER")
                             } label: {
                                 Text("OK")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .frame(width: 54, height: 54)
-                                    .background(Circle().fill(accent.opacity(0.24)))
-                                    .overlay(Circle().strokeBorder(accent.opacity(0.6), lineWidth: 1))
+                                    .font(.system(size: 15, weight: .bold))
+                                    .frame(width: 58, height: 58)
+                                    .background(Circle().fill(accent.opacity(0.26)))
+                                    .overlay(Circle().strokeBorder(accent.opacity(0.65), lineWidth: 1.2))
                                     .foregroundStyle(accent)
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("OK")
                             .accessibilityHint("Confirmar seleção")
                         }
-                        .frame(width: 156, height: 156)
+                        .frame(width: 184, height: 184)
                         .accessibilityElement(children: .contain)
                         .accessibilityLabel("Navegação")
 
-                        VStack(spacing: 16) {
+                        VStack(spacing: 20) {
                             remoteIconButton("gearshape.fill", "KEY_MENU", label: "Menu")
                             remoteIconButton("xmark", "KEY_EXIT", label: "Sair")
                         }
                     }
                     .frame(maxWidth: .infinity)
 
-                    // Media playback bar
-                    HStack(spacing: 8) {
-                        mediaActionButton("backward.fill", "KEY_REWIND", label: "Retroceder")
-                        mediaActionButton("play.fill", "KEY_PLAY", label: "Reproduzir")
-                        mediaActionButton("pause.fill", "KEY_PAUSE", label: "Pausar")
-                        mediaActionButton("stop.fill", "KEY_STOP", label: "Parar")
-                        mediaActionButton("forward.fill", "KEY_FF", label: "Avançar")
+                    // Ergonomic Tactile Rockers & Media Controls
+                    HStack(alignment: .center, spacing: 12) {
+                        volumeRockerPill
+                        centerPlaybackCluster
+                        channelRockerPill
                     }
+                    .frame(maxWidth: .infinity)
                 }
                 .disabled(!store.connected)
             }
@@ -842,30 +855,6 @@ struct RemoteView: View {
                 }
                 .disabled(!store.connected)
             }
-
-            audioCard
-
-            // Channel Up/Down
-            HStack(spacing: 12) {
-                Button {
-                    Haptic.press()
-                    store.press("KEY_CHDOWN")
-                } label: {
-                    Label("Canal −", systemImage: "chevron.down")
-                        .frame(maxWidth: .infinity).frame(height: 38)
-                }
-                .buttonStyle(GlassButton(accent: accent))
-
-                Button {
-                    Haptic.press()
-                    store.press("KEY_CHUP")
-                } label: {
-                    Label("Canal +", systemImage: "chevron.up")
-                        .frame(maxWidth: .infinity).frame(height: 38)
-                }
-                .buttonStyle(GlassButton(accent: accent))
-            }
-            .disabled(!store.connected)
 
             // Text / Keyboard Input
             GlassCard {
@@ -1040,15 +1029,194 @@ struct RemoteView: View {
         text = ""
     }
 
+    // MARK: - Rockers & Center Controls
+    private var volumeRockerPill: some View {
+        VStack(spacing: 0) {
+            Button {
+                Haptic.press()
+                store.volumeStep(true)
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .bold))
+                    .frame(width: 52, height: 44)
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Aumentar volume")
+
+            Divider().background(Color.white.opacity(0.12)).frame(width: 34)
+
+            Button {
+                Haptic.press()
+                store.toggleMute()
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: store.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(store.muted ? .red : mutedInk)
+                    if store.hasVolume {
+                        Text("\(Int(store.volume))")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(store.muted ? .red : accent)
+                    }
+                }
+                .frame(width: 52, height: 42)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(store.muted ? "Desativar mudo" : "Mudo")
+
+            Divider().background(Color.white.opacity(0.12)).frame(width: 34)
+
+            Button {
+                Haptic.press()
+                store.volumeStep(false)
+            } label: {
+                Image(systemName: "minus")
+                    .font(.system(size: 16, weight: .bold))
+                    .frame(width: 52, height: 44)
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Diminuir volume")
+        }
+        .frame(width: 52)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.8)
+        )
+    }
+
+    private var channelRockerPill: some View {
+        VStack(spacing: 0) {
+            Button {
+                Haptic.press()
+                store.press("KEY_CHUP")
+            } label: {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 16, weight: .bold))
+                    .frame(width: 52, height: 44)
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Canal para cima")
+
+            Divider().background(Color.white.opacity(0.12)).frame(width: 34)
+
+            Button {
+                Haptic.press()
+                store.press("KEY_GUIDE")
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "list.bullet.rectangle")
+                        .font(.system(size: 13))
+                    Text("Guia")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                .foregroundStyle(mutedInk)
+                .frame(width: 52, height: 42)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Guia de canais")
+
+            Divider().background(Color.white.opacity(0.12)).frame(width: 34)
+
+            Button {
+                Haptic.press()
+                store.press("KEY_CHDOWN")
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 16, weight: .bold))
+                    .frame(width: 52, height: 44)
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Canal para baixo")
+        }
+        .frame(width: 52)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.8)
+        )
+    }
+
+    private var centerPlaybackCluster: some View {
+        VStack(spacing: 10) {
+            Button {
+                Haptic.press()
+                store.press("KEY_SOURCE")
+            } label: {
+                Label("Entradas", systemImage: "cable.connector")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 34)
+            }
+            .buttonStyle(GlassButton(accent: accent))
+
+            HStack(spacing: 8) {
+                Button {
+                    Haptic.press()
+                    store.media("KEY_REWIND")
+                } label: {
+                    Image(systemName: "backward.fill")
+                        .font(.system(size: 13))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                }
+                .buttonStyle(GlassButton(accent: accent))
+                .accessibilityLabel("Retroceder")
+
+                Button {
+                    Haptic.press()
+                    store.media("KEY_PLAY")
+                } label: {
+                    Image(systemName: "playpause.fill")
+                        .font(.system(size: 15))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                }
+                .buttonStyle(GlassButton(selected: true, accent: accent))
+                .accessibilityLabel("Reproduzir ou pausar")
+
+                Button {
+                    Haptic.press()
+                    store.media("KEY_FF")
+                } label: {
+                    Image(systemName: "forward.fill")
+                        .font(.system(size: 13))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                }
+                .buttonStyle(GlassButton(accent: accent))
+                .accessibilityLabel("Avançar")
+            }
+
+            Button {
+                Haptic.press()
+                store.press("KEY_INFO")
+            } label: {
+                Label("Info", systemImage: "info.circle")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(mutedInk)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 26)
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
     private func dpadDirection(_ symbol: String, _ key: String, label: String = "") -> some View {
         Button {
             Haptic.press()
             store.press(key)
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 36, height: 36)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.white.opacity(0.88))
+                .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1062,21 +1230,7 @@ struct RemoteView: View {
         } label: {
             Image(systemName: symbol)
                 .font(.system(size: 16))
-                .frame(width: 44, height: 44)
-        }
-        .buttonStyle(GlassButton(accent: accent))
-        .accessibilityLabel(label.isEmpty ? key : label)
-    }
-
-    private func mediaActionButton(_ symbol: String, _ key: String, label: String = "") -> some View {
-        Button {
-            Haptic.press()
-            store.media(key)
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 13))
-                .frame(maxWidth: .infinity)
-                .frame(height: 34)
+                .frame(width: 46, height: 46)
         }
         .buttonStyle(GlassButton(accent: accent))
         .accessibilityLabel(label.isEmpty ? key : label)

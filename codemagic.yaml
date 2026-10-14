@@ -25,6 +25,34 @@ workflows:
 
           mkdir -p build/Payload
           cp -r build/SamsungTizen.xcarchive/Products/Applications/*.app build/Payload/
+
+          # Guarantee all required keys are in the app bundle Info.plist for native fullscreen on all iPhones
+          APP_DIR=$(ls -d build/Payload/*.app | head -n 1)
+          python3 -c "
+import plistlib
+plist_path = '${APP_DIR}/Info.plist'
+try:
+    with open(plist_path, 'rb') as f:
+        p = plistlib.load(f)
+except Exception:
+    p = {}
+
+with open('Sources/SamsungTizen/Info.plist', 'rb') as f:
+    source_p = plistlib.load(f)
+
+p.update(source_p)
+p['UILaunchStoryboardName'] = 'LaunchScreen'
+p['UILaunchScreen'] = {}
+p['CFBundleDisplayName'] = 'Controle Samsung'
+p['CFBundleDevelopmentRegion'] = 'pt-BR'
+
+with open(plist_path, 'wb') as f:
+    plistlib.dump(p, f)
+print('Successfully verified and merged Info.plist in app bundle:')
+for k, v in sorted(p.items()):
+    print(f'  {k}: {v}')
+"
+
           cd build
           zip -qr SamsungTizen.ipa Payload
     artifacts:
