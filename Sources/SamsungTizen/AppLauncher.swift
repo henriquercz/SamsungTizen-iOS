@@ -12,6 +12,7 @@ enum LaunchResult: Equatable {
     case failed(String)
 }
 
+@MainActor
 struct AppLauncher {
     let host: String
     weak var connection: TizenConnection?
@@ -113,7 +114,7 @@ struct AppLauncher {
     }
 
     /// Resolves DIAL names for well-known streaming apps
-    static func dialName(for app: TVApp) -> String? {
+    nonisolated static func dialName(for app: TVApp) -> String? {
         let title = app.title.lowercased()
         if title.contains("youtube") { return "YouTube" }
         if title.contains("netflix") { return "Netflix" }
@@ -122,7 +123,7 @@ struct AppLauncher {
     }
 
     /// Candidate IDs from catalog or app object
-    static func candidateIDs(for app: TVApp) -> [String] {
+    nonisolated static func candidateIDs(for app: TVApp) -> [String] {
         var ids = [app.id]
         if let matched = AppCatalog.match(title: app.title, id: app.id), let catalogIds = matched.ids {
             for cid in catalogIds where !ids.contains(cid) {

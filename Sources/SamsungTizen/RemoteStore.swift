@@ -300,7 +300,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     func press(_ key: String) {
         log("Controle", key)
         changeActivity { $0.pressed(key) }
-        guard let client = connection, connected else {
+        guard connection != nil, connected else {
             if !connecting && !host.isEmpty {
                 notice = "Sem conexão com a TV. Reconectando…"
                 connect(allowFirstUseTrust: false)
