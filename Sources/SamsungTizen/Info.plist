@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>pt-BR</string>
 	<key>CFBundleDisplayName</key>
-	<string>Samsung Remote</string>
+	<string>Controle Samsung</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -23,14 +23,14 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>This app requires access to your local Wi-Fi network to connect, discover, and send remote control commands to your Samsung TV.</string>
+	<string>Este aplicativo requer acesso à sua rede local Wi-Fi para descobrir, conectar e controlar sua Smart TV Samsung.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_dial._tcp</string>
 		<string>_mediarenderer._tcp</string>
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Access is required to select local media to stream directly to your Samsung TV.</string>
+	<string>O acesso à biblioteca de mídia é necessário para selecionar fotos, vídeos e músicas para transmitir diretamente para a sua Smart TV Samsung.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

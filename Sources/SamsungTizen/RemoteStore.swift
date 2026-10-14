@@ -34,7 +34,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     @Published var mediaFile: URL?
     @Published var mediaBusy = false
     @Published var casting = false
-    @Published var mediaStatus = "Choose a video, a song, or a photo."
+    @Published var mediaStatus = "Escolha um arquivo de vídeo, áudio ou imagem."
     @Published var preferredPanelHeight: CGFloat = 740
     @Published var favorites = Set(UserDefaults.standard.stringArray(forKey: "tv.favorites") ?? [])
     @Published var hiddenApps = Set(UserDefaults.standard.stringArray(forKey: "tv.hiddenApps") ?? [])
@@ -82,7 +82,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         (1...hdmiCount).map { number in
             let id = "HDMI\(number)"
             return TVInput(id: id, label: inputNames[id].flatMap { $0.isEmpty ? nil : $0 } ?? "HDMI \(number)", key: "KEY_HDMI\(number)")
-        } + [TVInput(id: "TV", label: inputNames["TV"].flatMap { $0.isEmpty ? nil : $0 } ?? "Live TV", key: "KEY_TV")]
+        } + [TVInput(id: "TV", label: inputNames["TV"].flatMap { $0.isEmpty ? nil : $0 } ?? "TV Aberta", key: "KEY_TV")]
     }
     var currentInput: TVInput? {
         guard !homeRequested, case .input(let id) = activity.focus else { return nil }
@@ -99,16 +99,16 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         if title != "Read" {
             let persisted = events.filter { $0.title != "Read" }
             do { try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true); try JSONEncoder().encode(persisted).write(to: dataDirectory.appendingPathComponent("events.json"), options: .atomic) }
-            catch { notice = "Could not save the local event history." }
+            catch { notice = "Não foi possível salvar o histórico local de eventos." }
         }
     }
 
-    var status: String { pairing ? "Choose Allow on your TV" : connecting ? "Connecting…" : connected ? "Connected" : "Disconnected" }
+    var status: String { pairing ? "Selecione 'Permitir' na sua TV" : connecting ? "Conectando…" : connected ? "Conectado" : "Desconectado" }
     var currentApp: String {
-        if homeRequested { return "Home menu" }
-        if let id = currentAppID { return apps.first { $0.id == id }?.title ?? "TV app" }
+        if homeRequested { return "Menu Início" }
+        if let id = currentAppID { return apps.first { $0.id == id }?.title ?? "Aplicativo" }
         if let input = currentInput { return input.label }
-        return connected ? "TV is on" : "Your TV, on your Mac."
+        return connected ? "TV ligada" : "Sua TV no seu iPhone."
     }
     var shortcuts: [TVApp] {
         let preferred = ["netflix", "youtube", "prime video", "disney", "globoplay", "spotify", "max", "apple"]
@@ -121,7 +121,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     }
     func connect(allowFirstUseTrust: Bool = true) {
         guard !connecting else { return }
-        guard TizenConnection.localHost(host) else { error = "Enter the TV's local IPv4 address or discover a TV on your network."; return }
+        guard TizenConnection.localHost(host) else { error = "Digite o endereço IPv4 local da TV ou faça uma busca na rede."; return }
         autoReconnect = true; error = nil; connecting = true; pairing = false
         pauseUsage()
         connection?.close(); refreshTask?.cancel(); iconTask?.cancel()
@@ -136,9 +136,9 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
             guard let self, self.connection === client else { return }
             self.connected = false; self.hasVolume = false; self.textInputOpen = false
             self.pauseUsage()
-            self.log("Connection lost", failure.localizedDescription)
+            self.log("Conexão perdida", failure.localizedDescription)
             if !self.connecting {
-                self.notice = "Connection lost. Reconnecting…"
+                self.notice = "Conexão perdida. Reconectando…"
                 self.scheduleReconnect()
             }
         }
@@ -148,7 +148,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
                 guard connection === client else { return }
                 connected = true; connecting = false; pairing = false; notice = nil
                 await refreshInfo()
-                log("Connected", "\(name) · \(host)")
+                log("Conectado", "\(name) · \(host)")
                 UserDefaults.standard.set(host, forKey: "tv.host")
                 UserDefaults.standard.set(name, forKey: "tv.name")
                 UserDefaults.standard.set(mac, forKey: "tv.mac")
@@ -169,8 +169,8 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
                 client.close(); connected = false; connecting = false; pairing = false
                 let needsUser: Bool
                 if case .needsUser? = error as? RemoteError { needsUser = true } else { needsUser = false }
-                self.error = needsUser ? error.localizedDescription : "\(error.localizedDescription) Make sure the TV is on and on the same Wi-Fi network."
-                log("Connection failed", error.localizedDescription)
+                self.error = needsUser ? error.localizedDescription : "\(error.localizedDescription) Verifique se a TV está ligada e na mesma rede Wi-Fi."
+                log("Falha na conexão", error.localizedDescription)
                 if allowFirstUseTrust || needsUser { autoReconnect = false }
                 scheduleReconnect()
             }
@@ -192,7 +192,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     }
     func discover() {
         guard !discovering else { return }; discovering = true; error = nil
-        Task { devices = await TVDiscovery.search(); discovering = false; if devices.isEmpty { notice = "No TV found. Turn on your TV or enter its IP address below." } }
+        Task { devices = await TVDiscovery.search(); discovering = false; if devices.isEmpty { notice = "Nenhuma TV encontrada. Ligue a TV ou digite o endereço IP abaixo." } }
     }
     func select(_ tv: TVDevice) {
         disconnect(); host = tv.host; name = tv.name; model = tv.model; mac = tv.mac ?? ""
@@ -212,7 +212,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         guard let client = connection, connected else { return }
         do {
             let installed = try await client.installedApps()
-            guard !installed.isEmpty else { throw RemoteError.message("The TV sent an empty app list.") }
+            guard !installed.isEmpty else { throw RemoteError.message("A TV retornou uma lista vazia de aplicativos.") }
             apps = installed.map { app in
                 let known = AppCatalog.match(title: app.name, id: app.id)
                 return TVApp(id: app.id, title: app.name, icon: known?.icon, type: app.type, iconPath: app.iconPath)
@@ -222,7 +222,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
             // Tizen 5 and later stopped listing apps; offer well-known Samsung app IDs instead.
             apps = AppCatalog.entries.compactMap { entry in entry.ids?.first.map { TVApp(id: $0, title: entry.title, icon: entry.icon, type: entry.type) } }
             appsFromCatalog = true
-            log("App list unavailable", error.localizedDescription)
+            log("Lista de apps indisponível", error.localizedDescription)
         }
         if UserDefaults.standard.object(forKey: "tv.favorites") == nil {
             favorites = Set(apps.filter { ["Netflix", "YouTube", "Prime Video", "Disney+"].contains(AppCatalog.match(title: $0.title, id: $0.id)?.title ?? "") }.prefix(4).map(\.id))
@@ -276,10 +276,10 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     func perform(_ action: @escaping (TizenConnection) async throws -> Void) {
         guard connected, let client = connection else { return }
         error = nil
-        Task { do { try await action(client) } catch { self.error = error.localizedDescription; self.log("Command failed", error.localizedDescription) } }
+        Task { do { try await action(client) } catch { self.error = error.localizedDescription; self.log("Falha no comando", error.localizedDescription) } }
     }
     func press(_ key: String) {
-        log("Remote", key)
+        log("Controle", key)
         changeActivity { $0.pressed(key) }
         perform { client in
             try await client.key(key)
@@ -292,7 +292,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     }
     func endSwipe() { swipe.end() }
     func launch(_ app: TVApp) {
-        log("Launch app", app.title)
+        log("Abrir aplicativo", app.title)
         changeActivity { $0.opened(.app(app.id)) }
         perform { client in try await client.launch(app.id, type: app.type) }
     }
@@ -312,7 +312,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         perform { _ in try await renderer.setMute(target); await self.refreshVolume() }
     }
     func input(_ input: TVInput) {
-        log("Switch input", input.label)
+        log("Alternar entrada", input.label)
         changeActivity { $0.opened(.input(input.id)) }
         perform { try await $0.key(input.key) }
     }
@@ -337,7 +337,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         UserDefaults.standard.set(Array(favorites), forKey: "tv.favorites")
     }
     private func saveUsage() {
-        do { try journal.save() } catch { notice = "Could not save usage history." }
+        do { try journal.save() } catch { notice = "Não foi possível salvar o histórico de uso." }
         usageRevision += 1
     }
     private func pauseUsage() { journal.pause(); saveUsage(); powerActive = false }
@@ -348,7 +348,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     var mostUsedApps: [TVApp] { usage(days: 7).compactMap { total in apps.first { $0.id == total.id } } }
     func setMediaFile(_ url: URL) {
         mediaFile = url
-        mediaStatus = "Ready to send. This will open the file on your TV."
+        mediaStatus = "Pronto para enviar. Isso reproduzirá o arquivo na sua TV."
     }
     func castMedia() {
         guard !mediaBusy, connected, let file = mediaFile else { return }
@@ -364,8 +364,8 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
                 let url = try await server.start()
                 try await control.play(url, title: file.lastPathComponent, mime: server.mime)
                 fileServer?.stop(); fileServer = server; casting = true
-                mediaStatus = "Sent to TV · \(file.lastPathComponent)"; log("Send media", file.lastPathComponent)
-            } catch { newServer?.stop(); self.error = error.localizedDescription; mediaStatus = "Could not play this file." }
+                mediaStatus = "Transmitindo para TV · \(file.lastPathComponent)"; log("Transmitir mídia", file.lastPathComponent)
+            } catch { newServer?.stop(); self.error = error.localizedDescription; mediaStatus = "Não foi possível reproduzir este arquivo." }
         }
     }
     func controlCast(_ action: String) {
@@ -375,20 +375,20 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
             defer { mediaBusy = false }
             do {
                 try await renderer.transport(action)
-                if action == "Stop" { fileServer?.stop(); fileServer = nil; casting = false; mediaStatus = "Casting stopped." }
-                else { mediaStatus = action == "Pause" ? "Media paused on TV." : "Playing on TV." }
+                if action == "Stop" { fileServer?.stop(); fileServer = nil; casting = false; mediaStatus = "Transmissão interrompida." }
+                else { mediaStatus = action == "Pause" ? "Mídia pausada na TV." : "Reproduzindo na TV." }
             } catch { self.error = error.localizedDescription }
         }
     }
     func power() {
         if connected {
             cancelSleepTimer()
-            log("Remote", "KEY_POWER")
-            perform { client in try await client.key("KEY_POWER"); self.disconnect(); self.notice = "TV turned off." }
+            log("Controle", "KEY_POWER")
+            perform { client in try await client.key("KEY_POWER"); self.disconnect(); self.notice = "TV desligada." }
         } else {
             do {
                 try TVDiscovery.wake(mac: mac, host: host)
-                notice = "Sinal de inicialização (Wake-on-LAN) enviado. Conectando..."
+                notice = "Sinal de inicialização (Wake-on-LAN) enviado. Se a TV continuar desligada, ative 'Ligar pelo celular' nas configurações de rede da TV."
                 Task {
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
                     self.connect()
@@ -447,9 +447,9 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         Task {
             do {
                 try await Task.detached(priority: .userInitiated) { try PairingToken.delete(pairingHost) }.value
-                notice = "Saved pairing removed. Connect to pair this TV again."
+                notice = "Pareamento salvo removido. Conecte-se para parear esta TV novamente."
             } catch {
-                self.error = "Could not remove saved pairing: \(error.localizedDescription)"
+                self.error = "Não foi possível remover o pareamento salvo: \(error.localizedDescription)"
             }
         }
     }

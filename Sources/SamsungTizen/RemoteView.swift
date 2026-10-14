@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 private let mutedInk = Color.white.opacity(0.55)
 
 private enum RemoteTab: String, CaseIterable, Identifiable {
-    case home = "TV", remote = "Remote", apps = "Apps", media = "Cast", usage = "Activity"
+    case home = "TV", remote = "Controle", apps = "Apps", media = "Transmitir", usage = "Atividade"
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -123,6 +123,7 @@ struct RemoteView: View {
     @State private var renameText = ""
     @State private var showRenameAlert = false
     @State private var showForgetConfirm = false
+    @State private var showNumberPad = false
 
     private var currentApp: TVApp? { store.currentAppID.flatMap { id in store.apps.first { $0.id == id } } }
     private var theme: BrandTheme {
@@ -195,24 +196,24 @@ struct RemoteView: View {
                 store.setMediaFile(url)
             }
         }
-        .alert("Rename Input", isPresented: $showRenameAlert) {
-            TextField("Input Name (e.g. PS5)", text: $renameText)
-            Button("Save") {
+        .alert("Renomear Entrada", isPresented: $showRenameAlert) {
+            TextField("Nome da entrada (ex: PS5)", text: $renameText)
+            Button("Salvar") {
                 if let input = renamingInput {
                     store.renameInput(input, to: renameText)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancelar", role: .cancel) {}
         } message: {
-            Text("Enter a friendly name for this TV input port.")
+            Text("Digite um nome personalizado para esta porta de entrada da TV.")
         }
-        .confirmationDialog("Forget TV Pairing?", isPresented: $showForgetConfirm, titleVisibility: .visible) {
-            Button("Forget pairing", role: .destructive) {
+        .confirmationDialog("Esquecer Pareamento da TV?", isPresented: $showForgetConfirm, titleVisibility: .visible) {
+            Button("Esquecer pareamento", role: .destructive) {
                 store.forgetPairing()
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancelar", role: .cancel) {}
         } message: {
-            Text("The saved token and certificate for this TV will be removed from your device.")
+            Text("O token e certificado salvos para esta TV serão removidos deste dispositivo.")
         }
     }
 
@@ -301,7 +302,7 @@ struct RemoteView: View {
 
     // MARK: - Sleep Timer UI
     @ViewBuilder private var sleepTimerPresetsMenu: some View {
-        Section("Timer de Desligamento") {
+        Section("Desligamento Automático") {
             Button {
                 Haptic.press()
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
@@ -539,7 +540,7 @@ struct RemoteView: View {
                 GlassCard {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Label("Favorites", systemImage: "star.fill")
+                            Label("Favoritos", systemImage: "star.fill")
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundStyle(accent)
                             Spacer()
@@ -547,7 +548,7 @@ struct RemoteView: View {
                                 Haptic.tap()
                                 tab = .apps
                             } label: {
-                                Text("See all").font(.system(size: 11, weight: .medium)).foregroundStyle(mutedInk)
+                                Text("Ver todos").font(.system(size: 11, weight: .medium)).foregroundStyle(mutedInk)
                             }
                         }
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 12) {
@@ -612,7 +613,7 @@ struct RemoteView: View {
 
                 HStack {
                     Circle().fill(store.connected ? accent : mutedInk).frame(width: 6, height: 6)
-                    Text(store.connected ? (store.currentAppID != nil || store.currentInput != nil ? "Active on your TV" : "Connected") : "Disconnected")
+                    Text(store.connected ? (store.currentAppID != nil || store.currentInput != nil ? "Ativo na TV" : "Conectado") : "Desconectado")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(mutedInk)
                     Spacer()
@@ -636,7 +637,7 @@ struct RemoteView: View {
             VStack(spacing: 12) {
                 HStack {
                     Image(systemName: "speaker.wave.2.fill").foregroundStyle(mutedInk)
-                    Text("TV Volume").font(.system(size: 13, weight: .semibold))
+                    Text("Volume da TV").font(.system(size: 13, weight: .semibold))
                     Spacer()
                     if store.hasVolume {
                         Text("\(Int(store.volume))")
@@ -668,7 +669,7 @@ struct RemoteView: View {
                     Image(systemName: "speaker.wave.3.fill").font(.system(size: 13)).foregroundStyle(mutedInk)
                 }
                 HStack {
-                    Text(store.muted ? "Muted" : store.hasVolume || !store.connected ? "TV speakers" : "Volume buttons work via remote.")
+                    Text(store.muted ? "Mudo" : store.hasVolume || !store.connected ? "Alto-falantes da TV" : "Botões de volume funcionam via controle.")
                         .font(.system(size: 10))
                         .foregroundStyle(mutedInk)
                     Spacer()
@@ -699,20 +700,20 @@ struct RemoteView: View {
             GlassCard {
                 VStack(spacing: 18) {
                     HStack(spacing: 8) {
-                        Text(store.currentApp.isEmpty ? "Samsung Remote" : store.currentApp)
+                        Text(store.currentApp.isEmpty ? "Controle Samsung" : store.currentApp)
                             .font(.system(size: 14, weight: .bold))
                             .lineLimit(1)
                         Spacer()
                         sleepTimerQuickButton
                         Circle().fill(store.connected ? Color.green : Color.orange).frame(width: 6, height: 6)
-                        Text(store.connected ? "Ready" : "Disconnected").font(.system(size: 10)).foregroundStyle(mutedInk)
+                        Text(store.connected ? "Pronto" : "Desconectado").font(.system(size: 10)).foregroundStyle(mutedInk)
                     }
 
                     // D-Pad and Core Action cluster
                     HStack(spacing: 16) {
                         VStack(spacing: 16) {
-                            remoteIconButton("house.fill", "KEY_HOME")
-                            remoteIconButton("arrow.uturn.backward", "KEY_RETURN")
+                            remoteIconButton("house.fill", "KEY_HOME", label: "Início")
+                            remoteIconButton("arrow.uturn.backward", "KEY_RETURN", label: "Voltar")
                         }
 
                         // Circular D-Pad
@@ -722,16 +723,16 @@ struct RemoteView: View {
                                 .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8))
 
                             VStack {
-                                dpadDirection("chevron.up", "KEY_UP")
+                                dpadDirection("chevron.up", "KEY_UP", label: "Para cima")
                                 Spacer()
-                                dpadDirection("chevron.down", "KEY_DOWN")
+                                dpadDirection("chevron.down", "KEY_DOWN", label: "Para baixo")
                             }
                             .padding(8)
 
                             HStack {
-                                dpadDirection("chevron.left", "KEY_LEFT")
+                                dpadDirection("chevron.left", "KEY_LEFT", label: "Para a esquerda")
                                 Spacer()
-                                dpadDirection("chevron.right", "KEY_RIGHT")
+                                dpadDirection("chevron.right", "KEY_RIGHT", label: "Para a direita")
                             }
                             .padding(8)
 
@@ -748,36 +749,46 @@ struct RemoteView: View {
                                     .foregroundStyle(accent)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("OK")
+                            .accessibilityHint("Confirmar seleção")
                         }
                         .frame(width: 156, height: 156)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel("Navegação")
 
                         VStack(spacing: 16) {
-                            remoteIconButton("gearshape.fill", "KEY_MENU")
-                            remoteIconButton("xmark", "KEY_EXIT")
+                            remoteIconButton("gearshape.fill", "KEY_MENU", label: "Menu")
+                            remoteIconButton("xmark", "KEY_EXIT", label: "Sair")
                         }
                     }
                     .frame(maxWidth: .infinity)
 
                     // Media playback bar
                     HStack(spacing: 8) {
-                        mediaActionButton("backward.fill", "KEY_REWIND")
-                        mediaActionButton("play.fill", "KEY_PLAY")
-                        mediaActionButton("pause.fill", "KEY_PAUSE")
-                        mediaActionButton("stop.fill", "KEY_STOP")
-                        mediaActionButton("forward.fill", "KEY_FF")
+                        mediaActionButton("backward.fill", "KEY_REWIND", label: "Retroceder")
+                        mediaActionButton("play.fill", "KEY_PLAY", label: "Reproduzir")
+                        mediaActionButton("pause.fill", "KEY_PAUSE", label: "Pausar")
+                        mediaActionButton("stop.fill", "KEY_STOP", label: "Parar")
+                        mediaActionButton("forward.fill", "KEY_FF", label: "Avançar")
                     }
                 }
                 .disabled(!store.connected)
             }
 
+            // Quick App & Input buttons
+            quickButtonsCard
+
+            // Numbers Pad
+            numberPadCard
+
             // Swipe pad for focus navigation
             GlassCard {
                 VStack(spacing: 8) {
                     HStack {
-                        Label("Swipe Pad", systemImage: "hand.draw.fill")
+                        Label("Área de Navegação", systemImage: "hand.draw.fill")
                             .font(.system(size: 12, weight: .semibold))
                         Spacer()
-                        Text("Swipe to navigate · Tap for OK").font(.system(size: 9)).foregroundStyle(mutedInk)
+                        Text("Deslize para navegar · Toque para OK").font(.system(size: 9)).foregroundStyle(mutedInk)
                     }
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(accent.opacity(0.08))
@@ -819,7 +830,7 @@ struct RemoteView: View {
                     Haptic.press()
                     store.press("KEY_CHDOWN")
                 } label: {
-                    Label("Channel −", systemImage: "chevron.down")
+                    Label("Canal −", systemImage: "chevron.down")
                         .frame(maxWidth: .infinity).frame(height: 38)
                 }
                 .buttonStyle(GlassButton(accent: accent))
@@ -828,7 +839,7 @@ struct RemoteView: View {
                     Haptic.press()
                     store.press("KEY_CHUP")
                 } label: {
-                    Label("Channel +", systemImage: "chevron.up")
+                    Label("Canal +", systemImage: "chevron.up")
                         .frame(maxWidth: .infinity).frame(height: 38)
                 }
                 .buttonStyle(GlassButton(accent: accent))
@@ -838,16 +849,16 @@ struct RemoteView: View {
             // Text / Keyboard Input
             GlassCard {
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("Text Input", systemImage: "keyboard")
+                    Label("Teclado", systemImage: "keyboard")
                         .font(.system(size: 12, weight: .semibold))
                     HStack {
-                        TextField("Type into TV text box", text: $text)
+                        TextField("Digite o texto para a TV...", text: $text)
                             .textFieldStyle(.plain)
                             .padding(10)
                             .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08)))
                             .onSubmit(sendText)
 
-                        Button("Send", action: sendText)
+                        Button("Enviar", action: sendText)
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(accent)
                             .disabled(text.isEmpty)
@@ -860,10 +871,144 @@ struct RemoteView: View {
                                 .padding(8)
                                 .background(Circle().fill(Color.white.opacity(0.08)))
                         }
+                        .accessibilityLabel("Confirmar texto")
                     }
                 }
                 .disabled(!store.connected)
             }
+        }
+    }
+
+    private var quickButtonsCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Acesso Rápido", systemImage: "bolt.fill")
+                    .font(.system(size: 12, weight: .semibold))
+
+                HStack(spacing: 8) {
+                    Button {
+                        Haptic.press()
+                        store.press("KEY_TV")
+                    } label: {
+                        Text("TV Aberta")
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 34)
+                    }
+                    .buttonStyle(GlassButton(accent: accent))
+
+                    if let youtube = store.shortcuts.first(where: { $0.title.localizedCaseInsensitiveContains("youtube") }) {
+                        Button {
+                            Haptic.press()
+                            store.launch(youtube)
+                        } label: {
+                            Text("YouTube")
+                                .font(.system(size: 11, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 34)
+                        }
+                        .buttonStyle(GlassButton(accent: Color.red))
+                    } else {
+                        Button {
+                            Haptic.press()
+                            store.press("KEY_GUIDE")
+                        } label: {
+                            Text("Guia")
+                                .font(.system(size: 11, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 34)
+                        }
+                        .buttonStyle(GlassButton(accent: accent))
+                    }
+
+                    if let netflix = store.shortcuts.first(where: { $0.title.localizedCaseInsensitiveContains("netflix") }) {
+                        Button {
+                            Haptic.press()
+                            store.launch(netflix)
+                        } label: {
+                            Text("Netflix")
+                                .font(.system(size: 11, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 34)
+                        }
+                        .buttonStyle(GlassButton(accent: Color.red))
+                    } else {
+                        Button {
+                            Haptic.press()
+                            store.press("KEY_SOURCE")
+                        } label: {
+                            Text("Entradas")
+                                .font(.system(size: 11, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 34)
+                        }
+                        .buttonStyle(GlassButton(accent: accent))
+                    }
+                }
+            }
+            .disabled(!store.connected)
+        }
+    }
+
+    private var numberPadCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label("Teclado Numérico", systemImage: "circle.grid.3x3.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Spacer()
+                    Button {
+                        Haptic.tap()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                            showNumberPad.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(showNumberPad ? "Ocultar" : "Mostrar")
+                                .font(.system(size: 11, weight: .medium))
+                            Image(systemName: showNumberPad ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .foregroundStyle(accent)
+                    }
+                }
+
+                if showNumberPad {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                        ForEach(1...9, id: \.self) { num in
+                            Button("\(num)") {
+                                Haptic.press()
+                                store.press("KEY_\(num)")
+                            }
+                            .buttonStyle(GlassButton(accent: accent))
+                            .frame(height: 38)
+                        }
+
+                        Button("Guia") {
+                            Haptic.press()
+                            store.press("KEY_GUIDE")
+                        }
+                        .buttonStyle(GlassButton(accent: accent))
+                        .frame(height: 38)
+
+                        Button("0") {
+                            Haptic.press()
+                            store.press("KEY_0")
+                        }
+                        .buttonStyle(GlassButton(accent: accent))
+                        .frame(height: 38)
+
+                        Button("Entradas") {
+                            Haptic.press()
+                            store.press("KEY_SOURCE")
+                        }
+                        .buttonStyle(GlassButton(accent: accent))
+                        .frame(height: 38)
+                    }
+                    .padding(.top, 4)
+                }
+            }
+            .disabled(!store.connected)
         }
     }
 
@@ -874,7 +1019,7 @@ struct RemoteView: View {
         text = ""
     }
 
-    private func dpadDirection(_ symbol: String, _ key: String) -> some View {
+    private func dpadDirection(_ symbol: String, _ key: String, label: String = "") -> some View {
         Button {
             Haptic.press()
             store.press(key)
@@ -886,9 +1031,10 @@ struct RemoteView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label.isEmpty ? key : label)
     }
 
-    private func remoteIconButton(_ symbol: String, _ key: String) -> some View {
+    private func remoteIconButton(_ symbol: String, _ key: String, label: String = "") -> some View {
         Button {
             Haptic.press()
             store.press(key)
@@ -898,9 +1044,10 @@ struct RemoteView: View {
                 .frame(width: 44, height: 44)
         }
         .buttonStyle(GlassButton(accent: accent))
+        .accessibilityLabel(label.isEmpty ? key : label)
     }
 
-    private func mediaActionButton(_ symbol: String, _ key: String) -> some View {
+    private func mediaActionButton(_ symbol: String, _ key: String, label: String = "") -> some View {
         Button {
             Haptic.press()
             store.media(key)
@@ -911,14 +1058,27 @@ struct RemoteView: View {
                 .frame(height: 34)
         }
         .buttonStyle(GlassButton(accent: accent))
+        .accessibilityLabel(label.isEmpty ? key : label)
     }
 
     // MARK: - Apps Panel
     private var appsPanel: some View {
-        VStack(spacing: 14) {
+        let filtered = store.shortcuts.filter { search.isEmpty || $0.title.localizedCaseInsensitiveContains(search) }
+
+        return VStack(spacing: 14) {
+            HStack {
+                Label("Aplicativos Instalados", systemImage: "square.grid.2x2.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(accent)
+                Spacer()
+                Text("\(store.shortcuts.count) disponíveis")
+                    .font(.system(size: 11))
+                    .foregroundStyle(mutedInk)
+            }
+
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(mutedInk)
-                TextField("Search \(store.shortcuts.count) apps", text: $search)
+                TextField("Buscar aplicativos...", text: $search)
                     .textFieldStyle(.plain)
                 if !search.isEmpty {
                     Button { search = "" } label: {
@@ -931,68 +1091,82 @@ struct RemoteView: View {
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.1), lineWidth: 0.8))
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 14) {
-                ForEach(store.shortcuts.filter { search.isEmpty || $0.title.localizedCaseInsensitiveContains(search) }) { app in
-                    let color = BrandTheme.forApp(app.id, title: app.title, icon: AppIcons.url(for: app)).color
-                    let isFav = store.favorites.contains(app.id)
-                    let isActive = store.displayForegroundID == app.id
+            if filtered.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 24))
+                        .foregroundStyle(mutedInk)
+                    Text("Nenhum aplicativo encontrado")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(mutedInk)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
+            } else {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 14) {
+                    ForEach(filtered) { app in
+                        let color = BrandTheme.forApp(app.id, title: app.title, icon: AppIcons.url(for: app)).color
+                        let isFav = store.favorites.contains(app.id)
+                        let isActive = store.displayForegroundID == app.id
 
-                    VStack(spacing: 8) {
-                        HStack {
-                            Spacer()
+                        VStack(spacing: 8) {
+                            HStack {
+                                Spacer()
+                                Button {
+                                    Haptic.tap()
+                                    store.toggleFavorite(app)
+                                } label: {
+                                    Image(systemName: isFav ? "star.fill" : "star")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(isFav ? color : mutedInk)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
                             Button {
-                                Haptic.tap()
-                                store.toggleFavorite(app)
+                                Haptic.press()
+                                store.launch(app)
                             } label: {
-                                Image(systemName: isFav ? "star.fill" : "star")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(isFav ? color : mutedInk)
+                                VStack(spacing: 8) {
+                                    AppMark(app: app, size: 48)
+                                        .shadow(color: color.opacity(0.24), radius: 8)
+                                    Text(app.title)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(.white)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.center)
+                                        .frame(height: 28)
+                                }
+                                .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.plain)
-                        }
+                            .disabled(!store.connected)
 
-                        Button {
-                            Haptic.press()
-                            store.launch(app)
-                        } label: {
-                            VStack(spacing: 8) {
-                                AppMark(app: app, size: 48)
-                                    .shadow(color: color.opacity(0.24), radius: 8)
-                                Text(app.title)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.center)
-                                    .frame(height: 28)
+                            if isActive {
+                                Text("Ativo")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(color)
+                            } else {
+                                Color.clear.frame(height: 11)
                             }
-                            .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(!store.connected)
-
-                        if isActive {
-                            Text("Active")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(color)
-                        } else {
-                            Color.clear.frame(height: 11)
+                        .padding(10)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(isActive ? color : Color.white.opacity(0.08), lineWidth: isActive ? 1.5 : 0.8)
+                        )
+                        .contextMenu {
+                            Button("Abrir na TV") { store.launch(app) }
+                            Button(isFav ? "Remover dos favoritos" : "Adicionar aos favoritos") { store.toggleFavorite(app) }
+                            Button("Ocultar da lista") { store.setHidden(app, true) }
                         }
-                    }
-                    .padding(10)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(isActive ? color : Color.white.opacity(0.08), lineWidth: isActive ? 1.5 : 0.8)
-                    )
-                    .contextMenu {
-                        Button(isFav ? "Remove from favorites" : "Add to favorites") { store.toggleFavorite(app) }
-                        Button("Hide from list") { store.setHidden(app, true) }
                     }
                 }
             }
 
             if !store.hiddenApps.isEmpty {
-                Button("Show \(store.hiddenApps.count) hidden apps") {
+                Button("Mostrar \(store.hiddenApps.count) aplicativos ocultos") {
                     store.showHiddenApps()
                 }
                 .font(.system(size: 11, weight: .medium))
@@ -1003,20 +1177,20 @@ struct RemoteView: View {
 
     // MARK: - Inputs Panel
     private func active(_ input: TVInput) -> Bool { store.displayForegroundID == input.id }
-    private func defaultLabel(_ input: TVInput) -> String { input.id == "TV" ? "Live TV" : input.id.replacingOccurrences(of: "HDMI", with: "HDMI ") }
+    private func defaultLabel(_ input: TVInput) -> String { input.id == "TV" ? "TV Aberta" : input.id.replacingOccurrences(of: "HDMI", with: "HDMI ") }
 
     private var inputsPanel: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Label("Inputs & Sources", systemImage: "cable.connector")
+                    Label("Entradas e Fontes", systemImage: "cable.connector")
                         .font(.system(size: 13, weight: .bold))
                     Spacer()
                     Button {
                         Haptic.press()
                         store.press("KEY_SOURCE")
                     } label: {
-                        Text("Source Menu")
+                        Text("Menu de Entradas")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(accent)
                     }
@@ -1055,7 +1229,7 @@ struct RemoteView: View {
                     Text(input.label)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
-                    Text(input.id == "TV" ? "Antenna / Cable" : defaultLabel(input))
+                    Text(input.id == "TV" ? "Antena / Cabo" : defaultLabel(input))
                         .font(.system(size: 10))
                         .foregroundStyle(mutedInk)
                 }
@@ -1074,7 +1248,7 @@ struct RemoteView: View {
         .buttonStyle(.plain)
         .disabled(!store.connected)
         .contextMenu {
-            Button("Rename…") {
+            Button("Renomear Entrada…") {
                 renamingInput = input
                 renameText = input.label == defaultLabel(input) ? "" : input.label
                 showRenameAlert = true
@@ -1092,14 +1266,14 @@ struct RemoteView: View {
                             .font(.system(size: 26, weight: .light))
                             .foregroundStyle(accent)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("AirPlay Screen Mirroring")
+                            Text("Espelhamento de Tela (AirPlay)")
                                 .font(.system(size: 14, weight: .bold))
-                            Text("Mirror iPhone screen to \(store.name)")
+                            Text("Espelhar tela do iPhone na \(store.name)")
                                 .font(.system(size: 10))
                                 .foregroundStyle(mutedInk)
                         }
                     }
-                    Text("Swipe down from the top right corner of your iPhone to open Control Center, tap Screen Mirroring, and select “\(store.name)”.")
+                    Text("Deslize do canto superior direito do seu iPhone para abrir a Central de Controle, toque em Espelhar a Tela e selecione “\(store.name)”.")
                         .font(.system(size: 11))
                         .foregroundStyle(mutedInk)
                 }
@@ -1107,7 +1281,7 @@ struct RemoteView: View {
 
             GlassCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    Label("Direct Media Casting (DLNA)", systemImage: "play.tv")
+                    Label("Transmitir Mídia (DLNA)", systemImage: "play.tv")
                         .font(.system(size: 14, weight: .bold))
 
                     if let file = store.mediaFile {
@@ -1130,14 +1304,14 @@ struct RemoteView: View {
                         .foregroundStyle(mutedInk)
 
                     HStack {
-                        Button("Choose File") {
+                        Button("Escolher Arquivo") {
                             showFilePicker = true
                         }
                         .buttonStyle(GlassButton(accent: accent))
 
                         Spacer()
 
-                        Button(store.mediaBusy ? "Sending…" : "Play on TV") {
+                        Button(store.mediaBusy ? "Transmitindo para TV..." : "Abrir na TV") {
                             Haptic.press()
                             store.castMedia()
                         }
@@ -1147,7 +1321,7 @@ struct RemoteView: View {
 
                     if store.casting {
                         HStack(spacing: 10) {
-                            ForEach([("play.fill", "Play"), ("pause.fill", "Pause"), ("stop.fill", "Stop")], id: \.1) { symbol, action in
+                            ForEach([("play.fill", "Play", "Reproduzir"), ("pause.fill", "Pause", "Pausar"), ("stop.fill", "Stop", "Parar transmissão")], id: \.1) { symbol, action, label in
                                 Button {
                                     Haptic.press()
                                     store.controlCast(action)
@@ -1155,6 +1329,7 @@ struct RemoteView: View {
                                     Image(systemName: symbol).frame(maxWidth: .infinity).frame(height: 32)
                                 }
                                 .buttonStyle(GlassButton(accent: accent))
+                                .accessibilityLabel(label)
                             }
                         }
                         .disabled(store.mediaBusy)
@@ -1170,22 +1345,22 @@ struct RemoteView: View {
         let total = totals.reduce(0) { $0 + $1.seconds }
 
         return VStack(spacing: 14) {
-            Picker("Period", selection: $usageDays) {
-                Text("Today").tag(1)
-                Text("7 days").tag(7)
-                Text("30 days").tag(30)
+            Picker("Período", selection: $usageDays) {
+                Text("Hoje").tag(1)
+                Text("Últimos 7 dias").tag(7)
+                Text("Últimos 30 dias").tag(30)
             }
             .pickerStyle(.segmented)
 
             GlassCard {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Total Screen Time")
+                    Text("Tempo de tela")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(mutedInk)
                     Text(duration(total))
                         .font(.system(size: 36, weight: .bold, design: .rounded))
                         .foregroundStyle(accent)
-                    Text("Usage tracked while connected")
+                    Text("Tempo monitorado enquanto a TV esteve conectada")
                         .font(.system(size: 10))
                         .foregroundStyle(mutedInk)
                 }
@@ -1193,6 +1368,16 @@ struct RemoteView: View {
 
             GlassCard {
                 VStack(spacing: 14) {
+                    HStack {
+                        Label("Histórico de Atividade", systemImage: "clock.arrow.circlepath")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(accent)
+                        Spacer()
+                        Text("Mais usados")
+                            .font(.system(size: 11))
+                            .foregroundStyle(mutedInk)
+                    }
+
                     ForEach(totals) { item in
                         let app = store.apps.first(where: { $0.id == item.id })
                         let color = BrandTheme.forApp(item.id, title: item.title, icon: app.flatMap(AppIcons.url)).color
@@ -1214,7 +1399,7 @@ struct RemoteView: View {
                     }
 
                     if totals.isEmpty {
-                        Text("No activity recorded yet.")
+                        Text("Nenhum histórico de atividade registrado ainda.")
                             .font(.system(size: 11))
                             .foregroundStyle(mutedInk)
                             .padding(.vertical, 16)
@@ -1238,11 +1423,11 @@ struct RemoteView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(store.pairing ? Color.green : Color.orange)
 
-                Text(store.pairing ? "A permission prompt appears on your TV screen. Choose 'Allow' with your TV remote." : "Make sure your iPhone and TV are connected to the same Wi-Fi network.")
+                Text(store.pairing ? "Uma solicitação de pareamento apareceu na sua TV. Escolha 'Permitir' usando o controle remoto físico." : "Certifique-se de que o seu iPhone e a TV estejam conectados à mesma rede Wi-Fi.")
                     .font(.system(size: 11))
                     .foregroundStyle(mutedInk)
 
-                Button(store.connecting ? "Connecting…" : "Connect to TV") {
+                Button(store.connecting ? "Conectando…" : "Conectar à TV") {
                     Haptic.press()
                     if store.connecting { store.disconnect() }
                     else if store.host.isEmpty {
@@ -1260,26 +1445,26 @@ struct RemoteView: View {
         VStack(spacing: 14) {
             GlassCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("TV Connection Settings")
+                    Text("Configurações da TV")
                         .font(.system(size: 14, weight: .bold))
 
-                    TextField("Device Name", text: $draftName)
+                    TextField("Nome da TV", text: $draftName)
                         .textFieldStyle(.plain)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08)))
 
-                    TextField("TV IP Address (e.g. 192.0.2.1)", text: $draftHost)
+                    TextField("Endereço IP (ex: 192.168.1.100)", text: $draftHost)
                         .textFieldStyle(.plain)
                         .keyboardType(.numbersAndPunctuation)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08)))
 
-                    TextField("Wi-Fi MAC Address (for Wake-on-LAN)", text: $draftMAC)
+                    TextField("Endereço MAC Wi-Fi (para Wake-on-LAN)", text: $draftMAC)
                         .textFieldStyle(.plain)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08)))
 
-                    Button("Save and Connect") {
+                    Button("Salvar e Conectar") {
                         Haptic.press()
                         store.disconnect()
                         store.host = draftHost.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1292,7 +1477,7 @@ struct RemoteView: View {
                     .disabled(!TizenConnection.localHost(draftHost.trimmingCharacters(in: .whitespacesAndNewlines)) || store.connecting)
 
                     if !store.host.isEmpty {
-                        Button("Forget Pairing") {
+                        Button("Esquecer pareamento") {
                             showForgetConfirm = true
                         }
                         .foregroundStyle(.red)
@@ -1303,7 +1488,7 @@ struct RemoteView: View {
 
             GlassCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    Button(store.discovering ? "Searching for TVs on Wi-Fi…" : "Find TVs on Local Network") {
+                    Button(store.discovering ? "Buscando TVs na rede Wi-Fi…" : "Buscar TVs na Rede Local") {
                         Haptic.press()
                         store.discover()
                     }
@@ -1332,8 +1517,8 @@ struct RemoteView: View {
             GlassCard {
                 Stepper(value: Binding(get: { store.hdmiCount }, set: store.setHDMICount), in: 1...4) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("HDMI Ports: \(store.hdmiCount)").font(.system(size: 13, weight: .semibold))
-                        Text("Match the ports on your TV.").font(.system(size: 10)).foregroundStyle(mutedInk)
+                        Text("Portas HDMI: \(store.hdmiCount)").font(.system(size: 13, weight: .semibold))
+                        Text("Configure de acordo com as portas físicas da sua TV.").font(.system(size: 10)).foregroundStyle(mutedInk)
                     }
                 }
             }

@@ -246,10 +246,10 @@ private final class PingResult: @unchecked Sendable {
         switch answer {
         case .unauthorized:
             throw RemoteError.needsUser(storedToken == nil
-                ? "The TV denied the connection. Choose Allow on the TV, or remove this Mac from the TV's device list and try again."
-                : "The TV no longer accepts this Mac. Use Forget pairing in Settings, then connect again.")
+                ? "A TV recusou a conexão. Selecione 'Permitir' na TV, ou remova este iPhone da lista de dispositivos da TV e tente novamente."
+                : "A TV não aceita mais este iPhone. Use 'Esquecer pareamento' nas Configurações e conecte novamente.")
         case .timedOut:
-            throw RemoteError.needsUser("Pairing timed out. Choose Allow on the TV and try again.")
+            throw RemoteError.needsUser("Tempo de pareamento esgotado. Selecione 'Permitir' na TV e tente novamente.")
         case .connected(let token):
             if let token, token != storedToken {
                 try await Task.detached(priority: .userInitiated) { try PairingToken.save(token, host: pairingHost) }.value

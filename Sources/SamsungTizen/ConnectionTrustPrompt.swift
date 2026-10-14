@@ -9,12 +9,12 @@ enum ConnectionTrustPrompt {
                 return
             }
             let alert = UIAlertController(
-                title: "Trust this Samsung TV?",
-                message: "Connect to the TV at \(host) on your local network? Next, choose Allow on that TV. Its certificate fingerprint will be saved on this iPhone.\n\nSHA-256: \(fingerprint)",
+                title: "Autorizar Conexão na TV",
+                message: "Uma solicitação de pareamento foi enviada para sua TV Samsung no endereço \(host). Por favor, selecione 'Permitir' na tela da TV com o controle remoto físico.\n\nImpressão digital SHA-256: \(fingerprint)",
                 preferredStyle: .alert
             )
-            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in continuation.resume(returning: false) })
-            alert.addAction(UIAlertAction(title: "Trust and pair", style: .default) { _ in continuation.resume(returning: true) })
+            alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel) { _ in continuation.resume(returning: false) })
+            alert.addAction(UIAlertAction(title: "Entendi / Aguardando confirmação", style: .default) { _ in continuation.resume(returning: true) })
             rootVC.present(alert, animated: true)
         }
     }
