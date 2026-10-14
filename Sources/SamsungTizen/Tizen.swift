@@ -212,7 +212,7 @@ private final class PingResult: @unchecked Sendable {
         guard Self.localHost(host) else { throw RemoteError.message("Enter the TV's local IPv4 address.") }
         let pairingHost = host
         let saved = await Task.detached(priority: .userInitiated) {
-            (PairingToken.read(pairingHost), TVCertificatePin.read(pairingHost))
+            (Self.loadToken(pairingHost), TVCertificatePin.read(pairingHost))
         }.value
         let storedToken = saved.0, storedPin = saved.1
         let confirmation = onCertificateTrust
@@ -253,7 +253,7 @@ private final class PingResult: @unchecked Sendable {
             throw RemoteError.needsUser("Tempo de pareamento esgotado. Selecione 'Permitir' na TV e tente novamente.")
         case .connected(let token):
             if let token, token != storedToken {
-                try await Task.detached(priority: .userInitiated) { try PairingToken.save(token, host: pairingHost) }.value
+                try await Task.detached(priority: .userInitiated) { try PairingKey.save(token, host: pairingHost) }.value
             }
         }
         // First-use trust is durable only after the TV has authorized this Mac.
@@ -261,6 +261,29 @@ private final class PingResult: @unchecked Sendable {
             try await Task.detached(priority: .userInitiated) { try TVCertificatePin.save(fingerprint, host: pairingHost) }.value
         }
         ready = true
+    }
+    nonisolated static func loadToken(_ host: String) -> String? {
+        if let key = PairingKey.read(host) {
+            return key
+        }
+        if let legacy = PairingToken.read(host) {
+            try? PairingKey.save(legacy, host: host)
+            return legacy
+        }
+        let docURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("pairing.json")
+        if let data = try? Data(contentsOf: docURL) {
+            if let entries = try? JSONDecoder().decode([String: PairingStore.Entry].self, from: data),
+               let token = entries[host]?.token {
+                try? PairingKey.save(token, host: host)
+                return token
+            }
+            if let entries = try? JSONDecoder().decode([String: String].self, from: data),
+               let token = entries[host] {
+                try? PairingKey.save(token, host: host)
+                return token
+            }
+        }
+        return nil
     }
     nonisolated static func validHost(_ host: String) -> Bool {
         let parts = host.split(separator: ".", omittingEmptySubsequences: false)

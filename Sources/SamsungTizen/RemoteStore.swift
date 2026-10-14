@@ -535,7 +535,18 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         disconnect()
         Task {
             do {
-                try await Task.detached(priority: .userInitiated) { try PairingToken.delete(pairingHost) }.value
+                try await Task.detached(priority: .userInitiated) {
+                    PairingKey.delete(pairingHost)
+                    try? PairingToken.delete(pairingHost)
+                    let appSupportFile = self.dataDirectory.appendingPathComponent("pairing.json")
+                    if FileManager.default.fileExists(atPath: appSupportFile.path) {
+                        try? FileManager.default.removeItem(at: appSupportFile)
+                    }
+                    let docFile = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("pairing.json")
+                    if FileManager.default.fileExists(atPath: docFile.path) {
+                        try? FileManager.default.removeItem(at: docFile)
+                    }
+                }.value
                 notice = "Pareamento salvo removido. Conecte-se para parear esta TV novamente."
             } catch {
                 self.error = "Não foi possível remover o pareamento salvo: \(error.localizedDescription)"

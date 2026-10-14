@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import SwiftUI
 
 enum FeatureChecks {
     static func equal<T: Equatable>(_ a: T, _ b: T) throws { guard a == b else { throw RemoteError.message("Check failed: \(a) != \(b)") } }
@@ -26,7 +27,9 @@ enum FeatureChecks {
         try testDiagnosticsKeepsLimitAndRedactsTokens()
         try await testKeyPipelinePreservesOrderUnderBurst()
         try testAppLauncherCandidateIDsAndDialMapping()
-        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, private pairing file, fresh configuration and custom parameters; diagnostics, key pipeline, and app launcher.")
+        try testSmartDeviceTypeDetection()
+        try testKeychainPairingRoundtrip()
+        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, private pairing file, fresh configuration and custom parameters; diagnostics, key pipeline, app launcher, smart device HDMI recognition, and iOS Keychain security.")
     }
 
     static func testPackagedResourcesLoadWithoutDeviceConfiguration() throws {
@@ -301,5 +304,60 @@ enum FeatureChecks {
         let candidates = AppLauncher.candidateIDs(for: netflix)
         try truth(candidates.contains("3201907018807"))
         try truth(candidates.contains("11101200001"))
+    }
+    static func testSmartDeviceTypeDetection() throws {
+        try equal(ConnectedDeviceType.detect(from: "Fire TV Stick 4K"), .fireTV)
+        try equal(ConnectedDeviceType.detect(from: "AFTMM"), .fireTV)
+        try equal(ConnectedDeviceType.detect(from: "Amazon Fire"), .fireTV)
+        try equal(ConnectedDeviceType.detect(from: "PlayStation 5"), .playstation)
+        try equal(ConnectedDeviceType.detect(from: "PS4 Pro"), .playstation)
+        try equal(ConnectedDeviceType.detect(from: "PS5"), .playstation)
+        try equal(ConnectedDeviceType.detect(from: "Xbox Series X"), .xbox)
+        try equal(ConnectedDeviceType.detect(from: "xbox one"), .xbox)
+        try equal(ConnectedDeviceType.detect(from: "Nintendo Switch"), .nintendoSwitch)
+        try equal(ConnectedDeviceType.detect(from: "Switch OLED"), .nintendoSwitch)
+        try equal(ConnectedDeviceType.detect(from: "Apple TV 4K"), .appleTV)
+        try equal(ConnectedDeviceType.detect(from: "Living Room AppleTV"), .appleTV)
+        try equal(ConnectedDeviceType.detect(from: "Chromecast with Google TV"), .chromecast)
+        try equal(ConnectedDeviceType.detect(from: "Google Cast"), .chromecast)
+        try equal(ConnectedDeviceType.detect(from: "HDMI 1"), .generic)
+        try equal(ConnectedDeviceType.detect(from: "Cable Box"), .generic)
+
+        try equal(ConnectedDeviceType.fireTV.symbol, "flame.fill")
+        try equal(ConnectedDeviceType.playstation.symbol, "gamecontroller.fill")
+        try equal(ConnectedDeviceType.xbox.symbol, "gamecontroller.fill")
+        try equal(ConnectedDeviceType.nintendoSwitch.symbol, "gamecontroller.fill")
+        try equal(ConnectedDeviceType.appleTV.symbol, "appletv.fill")
+        try equal(ConnectedDeviceType.chromecast.symbol, "tv.and.mediabox")
+        try equal(ConnectedDeviceType.generic.symbol, "cable.connector")
+
+        try truth(ConnectedDeviceType.fireTV.isRecognized)
+        try truth(ConnectedDeviceType.playstation.isRecognized)
+        try truth(ConnectedDeviceType.xbox.isRecognized)
+        try truth(ConnectedDeviceType.nintendoSwitch.isRecognized)
+        try truth(ConnectedDeviceType.appleTV.isRecognized)
+        try truth(ConnectedDeviceType.chromecast.isRecognized)
+        try truth(!ConnectedDeviceType.generic.isRecognized)
+    }
+    static func testKeychainPairingRoundtrip() throws {
+        let testHost = "192.0.2.99"
+        PairingKey.delete(testHost)
+        defer { PairingKey.delete(testHost) }
+
+        try equal(PairingKey.read(testHost), nil)
+        do {
+            try PairingKey.save("token-test-1234", host: testHost)
+            try equal(PairingKey.read(testHost), "token-test-1234")
+            try PairingKey.save("token-test-5678", host: testHost)
+            try equal(PairingKey.read(testHost), "token-test-5678")
+            PairingKey.delete(testHost)
+            try equal(PairingKey.read(testHost), nil)
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == "Keychain" && (nsError.code == -25300 || nsError.code == -34018) {
+                return
+            }
+            throw error
+        }
     }
 }
