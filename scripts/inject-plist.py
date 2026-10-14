@@ -32,11 +32,14 @@ def main():
         except Exception as e:
             print(f"Warning: Failed to load source Info.plist: {e}")
 
-    # Ensure required fullscreen and branding keys are explicitly present
-    current["UILaunchStoryboardName"] = "LaunchScreen"
-    current["UILaunchScreen"] = {}
+    # Ensure required fullscreen, identity, and branding keys are explicitly present
+    current["CFBundleIdentifier"] = "br.local.SamsungTizen"
+    current["CFBundleExecutable"] = "Samsung Remote"
+    current["CFBundleName"] = "Samsung Remote"
     current["CFBundleDisplayName"] = "Controle Samsung"
     current["CFBundleDevelopmentRegion"] = "pt-BR"
+    current["UILaunchStoryboardName"] = "LaunchScreen"
+    current["UILaunchScreen"] = {}
 
     with open(plist_path, "wb") as f:
         plistlib.dump(current, f)
