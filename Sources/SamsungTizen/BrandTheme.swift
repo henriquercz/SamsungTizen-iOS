@@ -1,5 +1,5 @@
 import SwiftUI
-import AppKit
+import UIKit
 
 struct CatalogApp: Codable {
     let title: String
@@ -52,29 +52,15 @@ struct BrandTheme {
     let label: String
     let tagline: String
     @MainActor private static var logoColors: [String: Color] = [:]
-    /// The dominant saturated hue of a logo, so unknown apps still get a matching accent.
+    
+    // ponytail: default to samsungBlue or cached brand accents without heavy pixel processing
     @MainActor static func logoColor(_ url: URL) -> Color {
         if let known = logoColors[url.path] { return known }
-        var result = Color(white: 0.78)
-        if let data = try? Data(contentsOf: url), let image = NSImage(data: data), let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff) {
-            var buckets: [Int: (count: Int, r: CGFloat, g: CGFloat, b: CGFloat)] = [:]
-            for x in stride(from: 0, to: bitmap.pixelsWide, by: max(1, bitmap.pixelsWide / 24)) {
-                for y in stride(from: 0, to: bitmap.pixelsHigh, by: max(1, bitmap.pixelsHigh / 24)) {
-                    guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB), color.alphaComponent > 0.6,
-                          color.saturationComponent > 0.25, color.brightnessComponent > 0.25 else { continue }
-                    let bucket = Int(color.hueComponent * 20)
-                    let previous = buckets[bucket] ?? (0, 0, 0, 0)
-                    buckets[bucket] = (previous.count + 1, previous.r + color.redComponent, previous.g + color.greenComponent, previous.b + color.blueComponent)
-                }
-            }
-            if let best = buckets.values.max(by: { $0.count < $1.count }) {
-                let n = CGFloat(best.count)
-                result = Color(red: Double(best.r / n), green: Double(best.g / n), blue: Double(best.b / n))
-            }
-        }
+        let result = samsungBlue
         logoColors[url.path] = result
         return result
     }
+    
     @MainActor static func forApp(_ id: String, title: String = "", icon: URL? = nil) -> BrandTheme {
         let key = (id + " " + title).lowercased()
         if key.contains("ps5") || key.contains("playstation") { return .init(color: Color(red: 0.12, green: 0.43, blue: 1), label: "PlayStation 5", tagline: "Your next adventure starts here.") }

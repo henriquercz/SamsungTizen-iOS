@@ -1,0 +1,27 @@
+name: SamsungTizen
+options:
+  bundleIdPrefix: br.local
+  deploymentTarget:
+    iOS: "17.0"
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    SWIFT_VERSION: "5.9"
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGN_IDENTITY: ""
+targets:
+  SamsungTizen:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources/SamsungTizen
+        excludes:
+          - Info.plist
+    info:
+      path: Sources/SamsungTizen/Info.plist
+    settings:
+      base:
+        PRODUCT_NAME: "Samsung Remote"
+        PRODUCT_BUNDLE_IDENTIFIER: "br.local.SamsungTizen"
+        ENABLE_BITCODE: "NO"

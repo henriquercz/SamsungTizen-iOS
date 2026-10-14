@@ -1,5 +1,5 @@
 import SwiftUI
-import AppKit
+import UIKit
 
 struct TVApp: Identifiable, Equatable { let id: String; let title: String; let icon: String?; var type: Int? = nil; var iconPath: String? = nil }
 struct TVInput: Identifiable, Equatable { let id: String; let label: String; let key: String }
@@ -57,7 +57,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     private var swipe = SwipePad()
     init() {
         events = (try? JSONDecoder().decode([RemoteEvent].self, from: Data(contentsOf: dataDirectory.appendingPathComponent("events.json")))) ?? []
-        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+        observers.append(NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.pauseUsage() }
         })
     }
@@ -224,7 +224,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
             var loaded = 0
             for app in missing {
                 guard !Task.isCancelled, connection === client, let path = app.iconPath else { break }
-                guard let data = try? await client.icon(path), NSImage(data: data) != nil, data.count <= 2_097_152 else { continue }
+                guard let data = try? await client.icon(path), UIImage(data: data) != nil, data.count <= 2_097_152 else { continue }
                 if (try? data.write(to: AppIcons.cacheFile(for: app.id), options: .atomic)) != nil { loaded += 1 }
             }
             if loaded > 0, !Task.isCancelled { iconRevision += 1 }
@@ -331,10 +331,9 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         return journal.totals(host: host, since: since)
     }
     var mostUsedApps: [TVApp] { usage(days: 7).compactMap { total in apps.first { $0.id == total.id } } }
-    func chooseMedia() {
-        let picker = NSOpenPanel(); picker.canChooseDirectories = false; picker.allowsMultipleSelection = false
-        picker.allowedContentTypes = [.movie, .audio, .image]; picker.prompt = "Select"; picker.title = "Send media to your Samsung TV"
-        if picker.runModal() == .OK { mediaFile = picker.url; mediaStatus = "Ready to send. This will open the file on your TV." }
+    func setMediaFile(_ url: URL) {
+        mediaFile = url
+        mediaStatus = "Ready to send. This will open the file on your TV."
     }
     func castMedia() {
         guard !mediaBusy, connected, let file = mediaFile else { return }
@@ -377,11 +376,6 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     }
     func forgetPairing() {
         guard !host.isEmpty else { return }
-        let alert = NSAlert()
-        alert.messageText = "Forget this TV's pairing?"
-        alert.informativeText = "The saved token and certificate for this TV will be removed from this Mac. You can connect and pair again."
-        alert.addButton(withTitle: "Forget pairing"); alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
         let pairingHost = host
         disconnect()
         Task {

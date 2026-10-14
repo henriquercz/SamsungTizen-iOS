@@ -1,5 +1,5 @@
 import Foundation
-import AppKit
+import UIKit
 
 enum FeatureChecks {
     static func equal<T: Equatable>(_ a: T, _ b: T) throws { guard a == b else { throw RemoteError.message("Check failed: \(a) != \(b)") } }
@@ -36,15 +36,16 @@ enum FeatureChecks {
             guard let icon = entry.icon else { continue }
             guard !icon.contains("/"), !icon.contains(".."),
                   let url = AppResources.bundle.url(forResource: icon, withExtension: nil, subdirectory: "AppAssets"),
-                  let image = NSImage(contentsOf: url) else {
+                  let data = try? Data(contentsOf: url),
+                  let _ = UIImage(data: data) else {
                 throw RemoteError.message("A packaged catalog icon is missing or invalid")
             }
-            try truth(image.isValid)
             try truth(entry.ids?.allSatisfy { !$0.isEmpty } ?? true)
         }
         for name in ["samsung", "playstation", "googlecast", "tv-hero"] {
             guard let url = AppResources.bundle.url(forResource: name, withExtension: "png", subdirectory: "AppAssets"),
-                  let image = NSImage(contentsOf: url), image.isValid else {
+                  let data = try? Data(contentsOf: url),
+                  let _ = UIImage(data: data) else {
                 throw RemoteError.message("A packaged brand image is missing or invalid")
             }
         }

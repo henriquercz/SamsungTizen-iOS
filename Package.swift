@@ -1,12 +1,18 @@
 // swift-tools-version: 5.9
 import PackageDescription
+
 let package = Package(
-    name: "TizenMenubar",
-    platforms: [.macOS(.v14)],
-    products: [.executable(name: "TizenMenubar", targets: ["TizenMenubar"])],
+    name: "SamsungTizen",
+    platforms: [
+        .iOS(.v17),
+        .macOS(.v14)
+    ],
+    products: [
+        .executable(name: "SamsungTizen", targets: ["SamsungTizen"])
+    ],
     targets: [
         .executableTarget(
-            name: "TizenMenubar",
+            name: "SamsungTizen",
             resources: [.copy("AppAssets"), .copy("app-catalog.json")]
         )
     ]
