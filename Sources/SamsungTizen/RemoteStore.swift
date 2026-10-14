@@ -198,7 +198,8 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         pauseUsage()
         fileServer?.stop(); fileServer = nil; casting = false
         autoReconnect = false; connectTask?.cancel(); reconnectTask?.cancel(); refreshTask?.cancel(); volumeTask?.cancel(); iconTask?.cancel()
-        sleepTimerTask?.cancel(); sleepTimerTask = nil; sleepTimerSecondsRemaining = nil
+        sleepTimerTask?.cancel(); sleepTimerTask = nil; sleepTimerSecondsRemaining = nil; sleepTimerDeadline = nil
+        BackgroundAudioTimer.shared.stop()
         connection?.close(); connection = nil; connected = false; connecting = false; pairing = false; hasVolume = false; textInputOpen = false
         renderer = nil; apps = []; appsFromCatalog = false
         activity.reset()
@@ -452,10 +453,8 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         log("Sleep Timer", "Agendado para desligar em \(minutes) minutos")
         notice = "TV desligará em \(minutes) min."
 
-        // Attempt native TV sleep command (KEY_SLEEP) so TV system manager schedules hardware shutdown
-        perform { client in
-            try await client.key("KEY_SLEEP")
-        }
+        // Activate silent background audio so iOS keeps the sleep timer alive
+        BackgroundAudioTimer.shared.start()
 
         sleepTimerTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -469,6 +468,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
                     self.sleepTimerDeadline = nil
                     self.sleepTimerTask = nil
                     self.log("Sleep Timer", "Tempo esgotado. Desligando TV...")
+                    BackgroundAudioTimer.shared.stop()
                     if self.connected {
                         self.perform { client in
                             try await client.key("KEY_POWER")
@@ -492,6 +492,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         sleepTimerTask = nil
         sleepTimerDeadline = nil
         sleepTimerSecondsRemaining = nil
+        BackgroundAudioTimer.shared.stop()
         notice = "Timer de desligamento cancelado."
         log("Sleep Timer", "Cancelado pelo usuário")
     }
@@ -502,6 +503,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
             sleepTimerTask?.cancel()
             sleepTimerTask = nil
             log("Sleep Timer", "Prazo atingido durante suspensão. Desligando...")
+            BackgroundAudioTimer.shared.stop()
             if connected {
                 perform { client in
                     try await client.key("KEY_POWER")

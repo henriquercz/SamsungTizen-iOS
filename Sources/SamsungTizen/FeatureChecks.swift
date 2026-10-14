@@ -29,7 +29,8 @@ enum FeatureChecks {
         try testAppLauncherCandidateIDsAndDialMapping()
         try testSmartDeviceTypeDetection()
         try testKeychainPairingRoundtrip()
-        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, private pairing file, fresh configuration and custom parameters; diagnostics, key pipeline, app launcher, smart device HDMI recognition, and iOS Keychain security.")
+        try await testBackgroundAudioTimerLifecycle()
+        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, private pairing file, fresh configuration and custom parameters; diagnostics, key pipeline, app launcher, smart device HDMI recognition, iOS Keychain security, and background audio timer.")
     }
 
     static func testPackagedResourcesLoadWithoutDeviceConfiguration() throws {
@@ -359,5 +360,21 @@ enum FeatureChecks {
             }
             throw error
         }
+    }
+    @MainActor
+    static func testBackgroundAudioTimerLifecycle() throws {
+        let timer = BackgroundAudioTimer.shared
+        if timer.isActive {
+            timer.stop()
+        }
+        try truth(!timer.isActive)
+        timer.start()
+        try truth(timer.isActive)
+        timer.start()
+        try truth(timer.isActive)
+        timer.stop()
+        try truth(!timer.isActive)
+        timer.stop()
+        try truth(!timer.isActive)
     }
 }
