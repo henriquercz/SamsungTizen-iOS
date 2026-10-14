@@ -745,63 +745,19 @@ struct RemoteView: View {
                     }
 
                     // D-Pad and Core Action cluster
-                    HStack(spacing: 14) {
-                        VStack(spacing: 20) {
+                    HStack(alignment: .center, spacing: 10) {
+                        VStack(spacing: 24) {
                             remoteIconButton("house.fill", "KEY_HOME", label: "Início")
                             remoteIconButton("arrow.uturn.backward", "KEY_RETURN", label: "Voltar")
                         }
 
-                        // Circular D-Pad
-                        ZStack {
-                            Circle()
-                                .fill(Color.white.opacity(0.06))
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(
-                                            LinearGradient(
-                                                colors: [.white.opacity(0.25), .white.opacity(0.06)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            ),
-                                            lineWidth: 1
-                                        )
-                                )
+                        Spacer(minLength: 2)
 
-                            VStack {
-                                dpadDirection("chevron.up", "KEY_UP", label: "Para cima")
-                                Spacer()
-                                dpadDirection("chevron.down", "KEY_DOWN", label: "Para baixo")
-                            }
-                            .padding(10)
+                        directionalPad
 
-                            HStack {
-                                dpadDirection("chevron.left", "KEY_LEFT", label: "Para a esquerda")
-                                Spacer()
-                                dpadDirection("chevron.right", "KEY_RIGHT", label: "Para a direita")
-                            }
-                            .padding(10)
+                        Spacer(minLength: 2)
 
-                            // Center OK Button
-                            Button {
-                                Haptic.press()
-                                store.press("KEY_ENTER")
-                            } label: {
-                                Text("OK")
-                                    .font(.system(size: 15, weight: .bold))
-                                    .frame(width: 58, height: 58)
-                                    .background(Circle().fill(accent.opacity(0.26)))
-                                    .overlay(Circle().strokeBorder(accent.opacity(0.65), lineWidth: 1.2))
-                                    .foregroundStyle(accent)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("OK")
-                            .accessibilityHint("Confirmar seleção")
-                        }
-                        .frame(width: 184, height: 184)
-                        .accessibilityElement(children: .contain)
-                        .accessibilityLabel("Navegação")
-
-                        VStack(spacing: 20) {
+                        VStack(spacing: 24) {
                             remoteIconButton("gearshape.fill", "KEY_MENU", label: "Menu")
                             remoteIconButton("xmark", "KEY_EXIT", label: "Sair")
                         }
@@ -1039,7 +995,58 @@ struct RemoteView: View {
         text = ""
     }
 
-    // MARK: - Rockers & Center Controls
+    // MARK: - Directional Pad & Rockers
+    private var directionalPad: some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.06))
+                .overlay(
+                    Circle()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [.white.opacity(0.25), .white.opacity(0.06)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+
+            VStack {
+                dpadDirection("chevron.up", "KEY_UP", label: "Para cima")
+                Spacer()
+                dpadDirection("chevron.down", "KEY_DOWN", label: "Para baixo")
+            }
+            .padding(RemoteMetrics.mobile.touchTargetPadding)
+
+            HStack {
+                dpadDirection("chevron.left", "KEY_LEFT", label: "Para a esquerda")
+                Spacer()
+                dpadDirection("chevron.right", "KEY_RIGHT", label: "Para a direita")
+            }
+            .padding(RemoteMetrics.mobile.touchTargetPadding)
+
+            // Center OK Button
+            Button {
+                Haptic.press()
+                store.press("KEY_ENTER")
+            } label: {
+                Text("OK")
+                    .font(.system(size: 17, weight: .bold))
+                    .frame(width: RemoteMetrics.mobile.centerButtonDiameter, height: RemoteMetrics.mobile.centerButtonDiameter)
+                    .background(Circle().fill(accent.opacity(0.26)))
+                    .overlay(Circle().strokeBorder(accent.opacity(0.65), lineWidth: 1.2))
+                    .foregroundStyle(accent)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("OK")
+            .accessibilityHint("Confirmar seleção")
+        }
+        .frame(width: RemoteMetrics.mobile.padDiameter, height: RemoteMetrics.mobile.padDiameter)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Navegação")
+    }
+
     private var volumeRockerPill: some View {
         VStack(spacing: 0) {
             Button {
@@ -1048,7 +1055,7 @@ struct RemoteView: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 16, weight: .bold))
-                    .frame(width: 52, height: 44)
+                    .frame(width: RemoteMetrics.mobile.rockerWidth, height: 48)
                     .foregroundStyle(.white.opacity(0.9))
                     .contentShape(Rectangle())
             }
@@ -1056,7 +1063,7 @@ struct RemoteView: View {
             .buttonRepeatBehavior(.enabled)
             .accessibilityLabel("Aumentar volume")
 
-            Divider().background(Color.white.opacity(0.12)).frame(width: 34)
+            Divider().background(Color.white.opacity(0.12)).frame(width: 36)
 
             Button {
                 Haptic.press()
@@ -1073,13 +1080,13 @@ struct RemoteView: View {
                             .foregroundStyle(store.muted ? .red : accent)
                     }
                 }
-                .frame(width: 52, height: 42)
+                .frame(width: RemoteMetrics.mobile.rockerWidth, height: 46)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(store.muted ? "Desativar mudo" : "Mudo")
 
-            Divider().background(Color.white.opacity(0.12)).frame(width: 34)
+            Divider().background(Color.white.opacity(0.12)).frame(width: 36)
 
             Button {
                 Haptic.press()
@@ -1087,7 +1094,7 @@ struct RemoteView: View {
             } label: {
                 Image(systemName: "minus")
                     .font(.system(size: 16, weight: .bold))
-                    .frame(width: 52, height: 44)
+                    .frame(width: RemoteMetrics.mobile.rockerWidth, height: 48)
                     .foregroundStyle(.white.opacity(0.9))
                     .contentShape(Rectangle())
             }
@@ -1095,7 +1102,7 @@ struct RemoteView: View {
             .buttonRepeatBehavior(.enabled)
             .accessibilityLabel("Diminuir volume")
         }
-        .frame(width: 52)
+        .frame(width: RemoteMetrics.mobile.rockerWidth, height: RemoteMetrics.mobile.rockerHeight)
         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1111,7 +1118,7 @@ struct RemoteView: View {
             } label: {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 16, weight: .bold))
-                    .frame(width: 52, height: 44)
+                    .frame(width: RemoteMetrics.mobile.rockerWidth, height: 48)
                     .foregroundStyle(.white.opacity(0.9))
                     .contentShape(Rectangle())
             }
@@ -1119,7 +1126,7 @@ struct RemoteView: View {
             .buttonRepeatBehavior(.enabled)
             .accessibilityLabel("Canal para cima")
 
-            Divider().background(Color.white.opacity(0.12)).frame(width: 34)
+            Divider().background(Color.white.opacity(0.12)).frame(width: 36)
 
             Button {
                 Haptic.press()
@@ -1132,13 +1139,13 @@ struct RemoteView: View {
                         .font(.system(size: 9, weight: .semibold))
                 }
                 .foregroundStyle(mutedInk)
-                .frame(width: 52, height: 42)
+                .frame(width: RemoteMetrics.mobile.rockerWidth, height: 46)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Guia de canais")
 
-            Divider().background(Color.white.opacity(0.12)).frame(width: 34)
+            Divider().background(Color.white.opacity(0.12)).frame(width: 36)
 
             Button {
                 Haptic.press()
@@ -1146,7 +1153,7 @@ struct RemoteView: View {
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 16, weight: .bold))
-                    .frame(width: 52, height: 44)
+                    .frame(width: RemoteMetrics.mobile.rockerWidth, height: 48)
                     .foregroundStyle(.white.opacity(0.9))
                     .contentShape(Rectangle())
             }
@@ -1154,7 +1161,7 @@ struct RemoteView: View {
             .buttonRepeatBehavior(.enabled)
             .accessibilityLabel("Canal para baixo")
         }
-        .frame(width: 52)
+        .frame(width: RemoteMetrics.mobile.rockerWidth, height: RemoteMetrics.mobile.rockerHeight)
         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1234,9 +1241,9 @@ struct RemoteView: View {
             store.press(key)
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 16, weight: .bold))
+                .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(.white.opacity(0.88))
-                .frame(width: 44, height: 44)
+                .frame(width: 48, height: 48)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1250,7 +1257,7 @@ struct RemoteView: View {
         } label: {
             Image(systemName: symbol)
                 .font(.system(size: 16))
-                .frame(width: 46, height: 46)
+                .frame(width: RemoteMetrics.mobile.navButtonHeight, height: RemoteMetrics.mobile.navButtonHeight)
         }
         .buttonStyle(GlassButton(accent: accent))
         .accessibilityLabel(label.isEmpty ? key : label)

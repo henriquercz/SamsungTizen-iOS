@@ -30,7 +30,8 @@ enum FeatureChecks {
         try testSmartDeviceTypeDetection()
         try testKeychainPairingRoundtrip()
         try await testBackgroundAudioTimerLifecycle()
-        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, private pairing file, fresh configuration and custom parameters; diagnostics, key pipeline, app launcher, smart device HDMI recognition, iOS Keychain security, and background audio timer.")
+        try testRemoteMetricsValues()
+        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, private pairing file, fresh configuration and custom parameters; diagnostics, key pipeline, app launcher, smart device HDMI recognition, iOS Keychain security, background audio timer, and remote touch metrics.")
     }
 
     static func testPackagedResourcesLoadWithoutDeviceConfiguration() throws {
@@ -376,5 +377,23 @@ enum FeatureChecks {
         try truth(!timer.isActive)
         timer.stop()
         try truth(!timer.isActive)
+    }
+
+    static func testRemoteMetricsValues() throws {
+        let metrics = RemoteMetrics.mobile
+        try equal(metrics.padDiameter, 220)
+        try equal(metrics.centerButtonDiameter, 76)
+        try equal(metrics.rockerWidth, 54)
+        try equal(metrics.rockerHeight, 142)
+        try equal(metrics.navButtonHeight, 46)
+        try equal(metrics.touchTargetPadding, 12)
+
+        let custom = RemoteMetrics(padDiameter: 200, centerButtonDiameter: 70, rockerWidth: 50, rockerHeight: 130, navButtonHeight: 44, touchTargetPadding: 10)
+        try equal(custom.padDiameter, 200)
+        try equal(custom.centerButtonDiameter, 70)
+        try equal(custom.rockerWidth, 50)
+        try equal(custom.rockerHeight, 130)
+        try equal(custom.navButtonHeight, 44)
+        try equal(custom.touchTargetPadding, 10)
     }
 }
