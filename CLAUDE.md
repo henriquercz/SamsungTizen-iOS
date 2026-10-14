@@ -13,7 +13,7 @@ This is a native macOS menu bar app that controls a Samsung TV running Tizen. It
 bash scripts/build.sh
 ```
 
-The output is `dist/SamsungTizen-menubar.app`. Do not commit the `dist/` folder. If the user has a code signing identity (`security find-identity -v -p codesigning`), offer to build with `SIGN_IDENTITY="<name>"`, so macOS keeps Keychain and Local Network approvals across rebuilds.
+The output is `dist/SamsungTizen-menubar.app`. Do not commit the `dist/` folder. If the user has a code signing identity (`security find-identity -v -p codesigning`), offer to build with `SIGN_IDENTITY="<name>"`, so macOS keeps the Local Network approval across rebuilds.
 
 ## 3. Find the TV
 

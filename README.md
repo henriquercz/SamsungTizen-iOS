@@ -35,7 +35,7 @@ open "dist/SamsungTizen-menubar.app"
 
 The script builds in a temporary directory, removes debug symbols, and creates a locally signed app bundle. It does not connect to a TV. Locally built apps are not notarized, so macOS may ask you to confirm the first time you open it.
 
-By default the app is signed ad hoc, so macOS treats every rebuild as a new app and asks again for Keychain and Local Network access. If you have a signing certificate, pass it to keep those approvals:
+By default the app is signed ad hoc, so macOS treats every rebuild as a new app and asks again for Local Network access. If you have a signing certificate, pass it to keep that approval:
 
 ```sh
 SIGN_IDENTITY="Apple Development: you@example.com (TEAMID)" bash scripts/build.sh
@@ -50,7 +50,7 @@ SIGN_IDENTITY="Apple Development: you@example.com (TEAMID)" bash scripts/build.s
 
 If macOS asks for Local Network access, allow it. Discovery may not work on guest networks or networks with device isolation. In that case, enter the IP address manually.
 
-The name, model, and Wi-Fi MAC address are read from the TV. The pairing token and the TV certificate fingerprint are stored in your Mac's Keychain. To pair again, use **Forget pairing** in Settings. If you chose Deny on the TV by mistake, remove the Mac from the TV's list under Settings, General, External Device Manager, Device Connection Manager, Device List.
+The name, model, and Wi-Fi MAC address are read from the TV. The pairing token and the TV certificate fingerprint are saved in a file that only your user account can read. The app does not use Keychain, so it never asks for your Mac password. To pair again, use **Forget pairing** in Settings. If you chose Deny on the TV by mistake, remove the Mac from the TV's list under Settings, General, External Device Manager, Device Connection Manager, Device List.
 
 The project ships with no TV address, device name, model, MAC address, or pairing token.
 
@@ -81,7 +81,7 @@ The project ships with no TV address, device name, model, MAC address, or pairin
 
 The app has no analytics, accounts, or cloud services. TV control stays on your local network. Catalog icons are bundled with the app; other icons a TV sends are cached locally.
 
-Preferences, favorites, and hidden apps are stored in macOS preferences. Usage, activity history, and cached icons are stored under `~/Library/Application Support/br.local.TizenRemote/`. Pairing tokens and certificate pins are stored in Keychain, separately for each TV address. None of these runtime files are part of this repository.
+Preferences, favorites, and hidden apps are stored in macOS preferences. Usage, activity history, and cached icons are stored under `~/Library/Application Support/br.local.TizenRemote/`. Pairing tokens and certificate pins are saved in `pairing.json` in the same folder, readable only by your user account, separately for each TV address. None of these runtime files are part of this repository.
 
 ## Offline checks
 

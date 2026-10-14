@@ -39,6 +39,6 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict></plist>
 PLIST
 # Ad-hoc by default. A stable identity (SIGN_IDENTITY="Apple Development: ...") keeps
-# Keychain and Local Network approvals across rebuilds.
+# the Local Network approval across rebuilds.
 codesign --force --deep --sign "${SIGN_IDENTITY:--}" --identifier br.local.TizenRemote "$APP"
 printf 'App created at %s\n' "$APP"

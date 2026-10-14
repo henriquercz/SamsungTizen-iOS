@@ -153,9 +153,11 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
             } catch {
                 guard connection === client else { return }
                 client.close(); connected = false; connecting = false; pairing = false
-                self.error = "\(error.localizedDescription) Make sure the TV is on and on the same Wi-Fi network."
+                let needsUser: Bool
+                if case .needsUser? = error as? RemoteError { needsUser = true } else { needsUser = false }
+                self.error = needsUser ? error.localizedDescription : "\(error.localizedDescription) Make sure the TV is on and on the same Wi-Fi network."
                 log("Connection failed", error.localizedDescription)
-                if allowFirstUseTrust { autoReconnect = false }
+                if allowFirstUseTrust || needsUser { autoReconnect = false }
                 scheduleReconnect()
             }
         }

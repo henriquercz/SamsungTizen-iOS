@@ -103,7 +103,11 @@ final class TVCertificateTrust: NSObject, URLSessionWebSocketDelegate, @unchecke
 
 enum RemoteError: LocalizedError {
     case message(String)
-    var errorDescription: String? { if case let .message(text) = self { return text }; return nil }
+    /// Only the person can fix this (trust the TV, choose Allow, pair again), so retrying on a timer would not help.
+    case needsUser(String)
+    var errorDescription: String? {
+        switch self { case .message(let text), .needsUser(let text): return text }
+    }
 }
 
 /// Frames for the Samsung Smart View remote channel (Tizen, 2016 and later).
@@ -212,7 +216,7 @@ private final class PingResult: @unchecked Sendable {
         let storedToken = saved.0, storedPin = saved.1
         let confirmation = onCertificateTrust
         guard storedPin != nil || (allowFirstUseTrust && confirmation != nil) else {
-            throw RemoteError.message("This TV has no trusted certificate yet. Click Connect to confirm first-time pairing.")
+            throw RemoteError.needsUser("This TV has no trusted certificate yet. Click Connect to confirm first-time pairing.")
         }
         let approval: (@Sendable (String, String) async -> Bool)?
         if allowFirstUseTrust {
@@ -241,11 +245,11 @@ private final class PingResult: @unchecked Sendable {
         try Task.checkCancellation()
         switch answer {
         case .unauthorized:
-            throw RemoteError.message(storedToken == nil
+            throw RemoteError.needsUser(storedToken == nil
                 ? "The TV denied the connection. Choose Allow on the TV, or remove this Mac from the TV's device list and try again."
                 : "The TV no longer accepts this Mac. Use Forget pairing in Settings, then connect again.")
         case .timedOut:
-            throw RemoteError.message("Pairing timed out. Choose Allow on the TV and try again.")
+            throw RemoteError.needsUser("Pairing timed out. Choose Allow on the TV and try again.")
         case .connected(let token):
             if let token, token != storedToken {
                 try await Task.detached(priority: .userInitiated) { try PairingToken.save(token, host: pairingHost) }.value

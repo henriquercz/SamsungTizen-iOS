@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit public source files without reading preferences, Keychain or the TV.
+"""Audit public source files without reading preferences, the saved pairing or the TV.
 
 Use --deny TEXT for any additional personal names or identifiers to exclude.
 Use --root DIR to audit a clean export before sharing it. This is a useful

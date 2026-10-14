@@ -129,7 +129,7 @@ if CommandLine.arguments.contains("--help") {
         client.onCertificateTrust = { host, fingerprint in await ConnectionTrustPrompt.confirm(host: host, fingerprint: fingerprint) }
         do {
             try await client.connect(allowFirstUseTrust: CommandLine.arguments.contains("--trust-new-tv"))
-            print("PAIRED: connection authorized; pairing stored in Keychain.")
+            print("PAIRED: connection authorized; pairing saved on this Mac.")
             do {
                 let apps = try await client.installedApps()
                 report["apps"] = apps.map { ["id": $0.id, "name": $0.name, "type": $0.type ?? 0, "bundledIcon": AppCatalog.match(title: $0.name, id: $0.id)?.icon ?? ""] }

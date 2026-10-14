@@ -21,8 +21,9 @@ enum FeatureChecks {
         try testSwipePadSendsOneKeyPerStep()
         try testConnectionAcceptsOnlyLocalIPv4Addresses()
         try testCertificateTrustRequiresApprovalAndRejectsChangedPins()
+        try testPairingFileIsPrivateAndForgetRemovesIt()
         try testFreshConfigurationHasNoDeviceIdentityAndLoadsCustomParameters()
-        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, fresh configuration and custom parameters.")
+        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, private pairing file, fresh configuration and custom parameters.")
     }
 
     static func testPackagedResourcesLoadWithoutDeviceConfiguration() throws {
@@ -193,6 +194,26 @@ enum FeatureChecks {
         try equal(configured.mac, mac)
     }
 
+    static func testPairingFileIsPrivateAndForgetRemovesIt() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = PairingStore(url: directory.appendingPathComponent("pairing.json"))
+        let pin = String(repeating: "a", count: 64)
+        try equal(store.entry("tv"), .init())
+        try store.update("tv") { $0.token = "12345678" }
+        try store.update("tv") { $0.pin = pin }
+        try store.update("other") { $0.token = "9" }
+        let reopened = PairingStore(url: store.url)
+        try equal(reopened.entry("tv"), .init(token: "12345678", pin: pin))
+        let mode = (try FileManager.default.attributesOfItem(atPath: store.url.path)[.posixPermissions] as? NSNumber)?.intValue
+        try equal(mode, 0o600)
+        try equal(try FileManager.default.contentsOfDirectory(atPath: directory.path), ["pairing.json"])
+        try reopened.update("tv") { $0 = .init() }
+        try equal(reopened.entry("tv"), .init())
+        try equal(reopened.entry("other").token, "9")
+        try reopened.update("other") { $0 = .init() }
+        try truth(!FileManager.default.fileExists(atPath: store.url.path))
+    }
     static func testUsageSurvivesRestartAndClipsMidnightWithoutCountingSleep() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

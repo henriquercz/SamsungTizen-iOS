@@ -2,7 +2,7 @@
 
 ## Original project
 
-This app is a fork of [LGwebOS-menubar](https://github.com/gabrielgreco1/LGwebOS-menubar), distributed under the MIT License included in [LICENSE](LICENSE). The menu bar shell, interface, usage journal, media server, and Keychain handling come from that project; the TV protocol layer was rewritten for Samsung Tizen.
+This app is a fork of [LGwebOS-menubar](https://github.com/gabrielgreco1/LGwebOS-menubar), distributed under the MIT License included in [LICENSE](LICENSE). The menu bar shell, interface, usage journal, and media server come from that project; the TV protocol layer was rewritten for Samsung Tizen.
 
 ## Icons and brand assets
 
