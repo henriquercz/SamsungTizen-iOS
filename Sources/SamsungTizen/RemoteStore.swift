@@ -40,6 +40,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     @Published var hiddenApps = Set(UserDefaults.standard.stringArray(forKey: "tv.hiddenApps") ?? [])
     @Published var hdmiCount = max(1, min(4, UserDefaults.standard.object(forKey: "tv.hdmiCount") as? Int ?? 3))
     @Published var inputNames = UserDefaults.standard.dictionary(forKey: "tv.inputNames") as? [String: String] ?? [:]
+    @Published var sleepTimerSecondsRemaining: Int? = nil
     private(set) var connection: TizenConnection?
     private var connectTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
@@ -47,6 +48,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     private var volumeTask: Task<Void, Never>?
     private var volumeEdited = Date.distantPast
     private var iconTask: Task<Void, Never>?
+    private var sleepTimerTask: Task<Void, Never>?
     private var autoReconnect = false
     private var renderer: UPnPRenderer?
     private let dataDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("br.local.TizenRemote")
@@ -62,6 +64,18 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         })
     }
 
+    var sleepTimerRemaining: TimeInterval? { sleepTimerSecondsRemaining.map { TimeInterval($0) } }
+    var formattedSleepTimer: String {
+        guard let seconds = sleepTimerSecondsRemaining, seconds > 0 else { return "00:00" }
+        let h = seconds / 3600
+        let m = (seconds % 3600) / 60
+        let s = seconds % 60
+        if h > 0 {
+            return String(format: "%d:%02d:%02d", h, m, s)
+        } else {
+            return String(format: "%02d:%02d", m, s)
+        }
+    }
     var pinnedApps: [TVApp] { shortcuts.filter { favorites.contains($0.id) } }
     var homeRequested: Bool { activity.homeShown }
     var inputs: [TVInput] {
@@ -171,6 +185,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         pauseUsage()
         fileServer?.stop(); fileServer = nil; casting = false
         autoReconnect = false; connectTask?.cancel(); reconnectTask?.cancel(); refreshTask?.cancel(); volumeTask?.cancel(); iconTask?.cancel()
+        sleepTimerTask?.cancel(); sleepTimerTask = nil; sleepTimerSecondsRemaining = nil
         connection?.close(); connection = nil; connected = false; connecting = false; pairing = false; hasVolume = false; textInputOpen = false
         renderer = nil; apps = []; appsFromCatalog = false
         activity.reset()
@@ -367,6 +382,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     }
     func power() {
         if connected {
+            cancelSleepTimer()
             log("Remote", "KEY_POWER")
             perform { client in try await client.key("KEY_POWER"); self.disconnect(); self.notice = "TV turned off." }
         } else {
@@ -381,6 +397,48 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
                 self.error = error.localizedDescription
             }
         }
+    }
+    func startSleepTimer(minutes: Int) {
+        guard minutes > 0 else { return }
+        sleepTimerTask?.cancel()
+        sleepTimerSecondsRemaining = minutes * 60
+        log("Sleep Timer", "Agendado para desligar em \(minutes) minutos")
+        notice = "TV desligará em \(minutes) min."
+        sleepTimerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { break }
+                guard let self else { break }
+                guard let remaining = self.sleepTimerSecondsRemaining else { break }
+                let next = remaining - 1
+                if next <= 0 {
+                    self.sleepTimerSecondsRemaining = nil
+                    self.sleepTimerTask = nil
+                    self.log("Sleep Timer", "Tempo esgotado. Desligando TV...")
+                    if self.connected {
+                        self.perform { client in
+                            try await client.key("KEY_POWER")
+                            self.disconnect()
+                            self.notice = "TV desligada pelo timer."
+                        }
+                    } else {
+                        self.disconnect()
+                        self.notice = "TV desligada pelo timer."
+                    }
+                    break
+                } else {
+                    self.sleepTimerSecondsRemaining = next
+                }
+            }
+        }
+    }
+    func cancelSleepTimer() {
+        guard sleepTimerTask != nil || sleepTimerSecondsRemaining != nil else { return }
+        sleepTimerTask?.cancel()
+        sleepTimerTask = nil
+        sleepTimerSecondsRemaining = nil
+        notice = "Timer de desligamento cancelado."
+        log("Sleep Timer", "Cancelado pelo usuário")
     }
     func forgetPairing() {
         guard !host.isEmpty else { return }

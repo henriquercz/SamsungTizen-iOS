@@ -149,6 +149,14 @@ struct RemoteView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 6)
 
+                // Sleep Timer Live Glass Pill
+                if store.sleepTimerSecondsRemaining != nil {
+                    sleepTimerActiveBanner
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 6)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 // Main Content View
                 ScrollView {
                     VStack(spacing: 14) {
@@ -166,6 +174,7 @@ struct RemoteView: View {
                 }
                 .scrollIndicators(.hidden)
             }
+            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: store.sleepTimerSecondsRemaining != nil)
 
             // Floating Liquid Glass Tab Bar (iOS 2026 Bottom Dock)
             VStack {
@@ -232,6 +241,9 @@ struct RemoteView: View {
 
             Spacer()
 
+            // Sleep Timer Menu Button
+            sleepTimerHeaderButton
+
             // Power button with liquid glow
             Button {
                 Haptic.heavy()
@@ -285,6 +297,175 @@ struct RemoteView: View {
                 )
         )
         .shadow(color: Color.black.opacity(0.3), radius: 14, x: 0, y: 7)
+    }
+
+    // MARK: - Sleep Timer UI
+    @ViewBuilder private var sleepTimerPresetsMenu: some View {
+        Section("Timer de Desligamento") {
+            Button {
+                Haptic.press()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    store.startSleepTimer(minutes: 15)
+                }
+            } label: {
+                Label("15 minutos", systemImage: "timer")
+            }
+            Button {
+                Haptic.press()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    store.startSleepTimer(minutes: 30)
+                }
+            } label: {
+                Label("30 minutos", systemImage: "timer")
+            }
+            Button {
+                Haptic.press()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    store.startSleepTimer(minutes: 45)
+                }
+            } label: {
+                Label("45 minutos", systemImage: "timer")
+            }
+            Button {
+                Haptic.press()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    store.startSleepTimer(minutes: 60)
+                }
+            } label: {
+                Label("1 hora (60 min)", systemImage: "clock")
+            }
+            Button {
+                Haptic.press()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    store.startSleepTimer(minutes: 90)
+                }
+            } label: {
+                Label("1 hora e meia (90 min)", systemImage: "clock")
+            }
+            Button {
+                Haptic.press()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    store.startSleepTimer(minutes: 120)
+                }
+            } label: {
+                Label("2 horas (120 min)", systemImage: "moon.zzz")
+            }
+        }
+
+        if store.sleepTimerSecondsRemaining != nil {
+            Section {
+                Button(role: .destructive) {
+                    Haptic.tap()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        store.cancelSleepTimer()
+                    }
+                } label: {
+                    Label("Cancelar Timer", systemImage: "xmark.circle")
+                }
+            }
+        }
+    }
+
+    private var sleepTimerHeaderButton: some View {
+        Menu {
+            sleepTimerPresetsMenu
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(store.sleepTimerSecondsRemaining != nil ? accent.opacity(0.25) : Color.white.opacity(0.08))
+                Image(systemName: store.sleepTimerSecondsRemaining != nil ? "timer" : "moon.zzz")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(store.sleepTimerSecondsRemaining != nil ? accent : mutedInk)
+            }
+            .frame(width: 38, height: 38)
+            .overlay(
+                Circle().strokeBorder(
+                    store.sleepTimerSecondsRemaining != nil ? accent.opacity(0.5) : Color.white.opacity(0.12),
+                    lineWidth: 0.8
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(store.sleepTimerSecondsRemaining != nil ? "Timer ativo: \(store.formattedSleepTimer)" : "Timer de desligamento")
+    }
+
+    private var sleepTimerQuickButton: some View {
+        Menu {
+            sleepTimerPresetsMenu
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: store.sleepTimerSecondsRemaining != nil ? "timer" : "moon.zzz")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(store.sleepTimerSecondsRemaining != nil ? store.formattedSleepTimer : "Timer")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(store.sleepTimerSecondsRemaining != nil ? accent : mutedInk)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(store.sleepTimerSecondsRemaining != nil ? accent.opacity(0.18) : Color.white.opacity(0.08))
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(store.sleepTimerSecondsRemaining != nil ? accent.opacity(0.4) : Color.white.opacity(0.12), lineWidth: 0.7)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var sleepTimerActiveBanner: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "timer")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(accent)
+                Text("Desliga em")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                Text(store.formattedSleepTimer)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(accent)
+            }
+
+            Spacer()
+
+            Button {
+                Haptic.tap()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    store.cancelSleepTimer()
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                    Text("Cancelar")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(Color.red.opacity(0.9))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.red.opacity(0.16)))
+                .overlay(Capsule().strokeBorder(Color.red.opacity(0.35), lineWidth: 0.7))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [accent.opacity(0.5), accent.opacity(0.12)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.8
+                )
+        )
+        .shadow(color: accent.opacity(0.2), radius: 8, x: 0, y: 4)
     }
 
     // MARK: - Floating Liquid Glass Tab Bar (Bottom Dock)
@@ -517,11 +698,12 @@ struct RemoteView: View {
         VStack(spacing: 14) {
             GlassCard {
                 VStack(spacing: 18) {
-                    HStack {
+                    HStack(spacing: 8) {
                         Text(store.currentApp.isEmpty ? "Samsung Remote" : store.currentApp)
                             .font(.system(size: 14, weight: .bold))
                             .lineLimit(1)
                         Spacer()
+                        sleepTimerQuickButton
                         Circle().fill(store.connected ? Color.green : Color.orange).frame(width: 6, height: 6)
                         Text(store.connected ? "Ready" : "Disconnected").font(.system(size: 10)).foregroundStyle(mutedInk)
                     }
@@ -1086,7 +1268,7 @@ struct RemoteView: View {
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08)))
 
-                    TextField("TV IP Address (e.g. 192.168.1.50)", text: $draftHost)
+                    TextField("TV IP Address (e.g. 192.0.2.1)", text: $draftHost)
                         .textFieldStyle(.plain)
                         .keyboardType(.numbersAndPunctuation)
                         .padding(10)
