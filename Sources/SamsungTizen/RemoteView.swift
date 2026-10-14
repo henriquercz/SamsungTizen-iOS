@@ -1400,20 +1400,29 @@ struct RemoteView: View {
     }
 
     private func inputRow(_ input: TVInput) -> some View {
-        Button {
+        let deviceType = ConnectedDeviceType.detect(from: input.label)
+        return Button {
             Haptic.press()
             store.input(input)
         } label: {
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(input.label.localizedCaseInsensitiveContains("PS5") ? Color(red: 0.05, green: 0.20, blue: 0.50) : Color.white.opacity(0.07))
-                    if input.label.localizedCaseInsensitiveContains("PS5") || input.label.localizedCaseInsensitiveContains("PlayStation") {
-                        BrandImage(name: "playstation", width: 22, height: 22)
-                    } else if input.label.localizedCaseInsensitiveContains("Chromecast") {
-                        BrandImage(name: "googlecast", width: 20, height: 20)
+                        .fill(deviceType.isRecognized ? deviceType.accentColor.opacity(0.18) : Color.white.opacity(0.07))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .strokeBorder(deviceType.isRecognized ? deviceType.accentColor.opacity(0.4) : Color.clear, lineWidth: 1)
+                        )
+                    if deviceType.isRecognized {
+                        Image(systemName: deviceType.symbol)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(deviceType.accentColor)
+                    } else if input.id == "TV" {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .font(.system(size: 14))
+                            .foregroundStyle(mutedInk)
                     } else {
-                        Image(systemName: input.id == "TV" ? "antenna.radiowaves.left.and.right" : "cable.connector")
+                        Image(systemName: deviceType.symbol)
                             .font(.system(size: 14))
                             .foregroundStyle(mutedInk)
                     }
@@ -1421,9 +1430,24 @@ struct RemoteView: View {
                 .frame(width: 36, height: 36)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(input.label)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
+                    HStack(spacing: 6) {
+                        Text(input.label)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                        if deviceType.isRecognized {
+                            HStack(spacing: 3) {
+                                Image(systemName: deviceType.symbol)
+                                    .font(.system(size: 8, weight: .bold))
+                                Text(deviceType.rawValue)
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(deviceType.accentColor.opacity(0.20), in: Capsule())
+                            .overlay(Capsule().strokeBorder(deviceType.accentColor.opacity(0.4), lineWidth: 0.6))
+                            .foregroundStyle(deviceType.accentColor)
+                        }
+                    }
                     Text(input.id == "TV" ? "Antena / Cabo" : defaultLabel(input))
                         .font(.system(size: 10))
                         .foregroundStyle(mutedInk)

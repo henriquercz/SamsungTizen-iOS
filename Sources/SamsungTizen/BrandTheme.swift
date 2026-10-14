@@ -77,3 +77,54 @@ struct BrandTheme {
         return .init(color: icon.map(logoColor) ?? samsungBlue, label: title, tagline: "Sua Samsung. Sua sala. Seu controle.")
     }
 }
+
+public enum ConnectedDeviceType: String, CaseIterable, Equatable {
+    case fireTV = "Fire TV"
+    case playstation = "PlayStation"
+    case xbox = "Xbox"
+    case nintendoSwitch = "Nintendo Switch"
+    case appleTV = "Apple TV"
+    case chromecast = "Chromecast"
+    case generic = "HDMI"
+
+    public var isRecognized: Bool {
+        self != .generic
+    }
+
+    public var symbol: String {
+        switch self {
+        case .fireTV: return "flame.fill"
+        case .playstation, .xbox, .nintendoSwitch: return "gamecontroller.fill"
+        case .appleTV: return "appletv.fill"
+        case .chromecast: return "tv.and.mediabox"
+        case .generic: return "cable.connector"
+        }
+    }
+
+    public var accentColor: Color {
+        switch self {
+        case .fireTV: return Color(red: 1.0, green: 0.6, blue: 0.0) // Amazon Fire Orange #FF9900
+        case .playstation: return Color(red: 0.0, green: 0.22, blue: 0.57) // PlayStation Blue #003791
+        case .xbox: return Color(red: 0.06, green: 0.49, blue: 0.06) // Xbox Green #107C10
+        case .nintendoSwitch: return Color(red: 0.90, green: 0.0, blue: 0.07) // Nintendo Red #E60012
+        case .appleTV: return Color.white.opacity(0.85)
+        case .chromecast: return Color(red: 0.26, green: 0.52, blue: 0.96) // Google Blue
+        case .generic: return Color.white.opacity(0.55)
+        }
+    }
+
+    public static func detect(from label: String) -> ConnectedDeviceType {
+        let lower = label.lowercased()
+        if lower.contains("fire") || lower.contains("aft") || lower.contains("amazon") { return .fireTV }
+        if lower.contains("playstation") || lower.contains("ps4") || lower.contains("ps5") { return .playstation }
+        if lower.contains("xbox") { return .xbox }
+        if lower.contains("switch") || lower.contains("nintendo") { return .nintendoSwitch }
+        if lower.contains("apple") || lower.contains("appletv") { return .appleTV }
+        if lower.contains("chromecast") || lower.contains("google") { return .chromecast }
+        return .generic
+    }
+
+    public static func detect(label: String) -> ConnectedDeviceType {
+        detect(from: label)
+    }
+}
