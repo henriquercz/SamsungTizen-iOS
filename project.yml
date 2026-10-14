@@ -24,4 +24,5 @@ targets:
       base:
         PRODUCT_NAME: "Samsung Remote"
         PRODUCT_BUNDLE_IDENTIFIER: "br.local.SamsungTizen"
+        TARGETED_DEVICE_FAMILY: "1,2"
         ENABLE_BITCODE: "NO"
