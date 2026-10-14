@@ -1453,7 +1453,7 @@ struct RemoteView: View {
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08)))
 
-                    TextField("Endereço IP (ex: 192.168.1.100)", text: $draftHost)
+                    TextField("Endereço IP (ex: 192.0.2.1)", text: $draftHost)
                         .textFieldStyle(.plain)
                         .keyboardType(.numbersAndPunctuation)
                         .padding(10)
