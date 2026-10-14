@@ -5,23 +5,26 @@ import UniformTypeIdentifiers
 private let mutedInk = Color.white.opacity(0.55)
 
 private enum RemoteTab: String, CaseIterable, Identifiable {
-    case home = "TV", remote = "Controle", apps = "Apps", media = "Transmitir", usage = "Atividade"
+    case home = "TV", remote = "Controle", apps = "Apps", usage = "Atividade"
     var id: String { rawValue }
     var symbol: String {
         switch self {
         case .home: return "tv"
         case .remote: return "dpad"
         case .apps: return "square.grid.2x2"
-        case .media: return "airplay.video"
         case .usage: return "chart.bar.xaxis"
         }
     }
 }
 
 private enum Haptic {
-    static func tap() { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-    static func press() { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
-    static func heavy() { UIImpactFeedbackGenerator(style: .heavy).impactOccurred() }
+    private static let light = UIImpactFeedbackGenerator(style: .light)
+    private static let medium = UIImpactFeedbackGenerator(style: .medium)
+    private static let strong = UIImpactFeedbackGenerator(style: .heavy)
+    static func prepare() { light.prepare(); medium.prepare() }
+    static func tap() { light.impactOccurred(); light.prepare() }
+    static func press() { medium.impactOccurred(); medium.prepare() }
+    static func heavy() { strong.impactOccurred() }
 }
 
 private struct GlassCard<Content: View>: View {
@@ -60,6 +63,7 @@ private struct GlassButton: ButtonStyle {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(selected ? accent.opacity(0.5) : Color.white.opacity(0.09), lineWidth: 0.7)
             )
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
@@ -125,6 +129,7 @@ struct RemoteView: View {
     @State private var showRenameAlert = false
     @State private var showForgetConfirm = false
     @State private var showNumberPad = false
+    @AppStorage("touchProbe") private var touchProbe = false
 
     private var currentApp: TVApp? { store.currentAppID.flatMap { id in store.apps.first { $0.id == id } } }
     private var theme: BrandTheme {
@@ -143,6 +148,12 @@ struct RemoteView: View {
                 startRadius: 40,
                 endRadius: 450
             ).ignoresSafeArea()
+
+            if touchProbe {
+                TouchProbe()
+                    .frame(width: 0, height: 0)
+                    .allowsHitTesting(false)
+            }
 
             VStack(spacing: 0) {
                 // Floating Liquid Glass Navbar (iOS 2026 Style)
@@ -547,7 +558,6 @@ struct RemoteView: View {
         case .home: homePanel
         case .remote: remotePanel
         case .apps: appsPanel
-        case .media: mediaPanel
         case .usage: usagePanel
         }
     }
@@ -834,7 +844,7 @@ struct RemoteView: View {
                         .frame(height: 84)
                         .contentShape(Rectangle())
                         .gesture(
-                            DragGesture(minimumDistance: 4)
+                            DragGesture(minimumDistance: 14)
                                 .onChanged { value in
                                     let delta = CGSize(
                                         width: value.translation.width - swipeTranslation.width,
@@ -1040,8 +1050,10 @@ struct RemoteView: View {
                     .font(.system(size: 16, weight: .bold))
                     .frame(width: 52, height: 44)
                     .foregroundStyle(.white.opacity(0.9))
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .buttonRepeatBehavior(.enabled)
             .accessibilityLabel("Aumentar volume")
 
             Divider().background(Color.white.opacity(0.12)).frame(width: 34)
@@ -1062,6 +1074,7 @@ struct RemoteView: View {
                     }
                 }
                 .frame(width: 52, height: 42)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(store.muted ? "Desativar mudo" : "Mudo")
@@ -1076,8 +1089,10 @@ struct RemoteView: View {
                     .font(.system(size: 16, weight: .bold))
                     .frame(width: 52, height: 44)
                     .foregroundStyle(.white.opacity(0.9))
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .buttonRepeatBehavior(.enabled)
             .accessibilityLabel("Diminuir volume")
         }
         .frame(width: 52)
@@ -1098,8 +1113,10 @@ struct RemoteView: View {
                     .font(.system(size: 16, weight: .bold))
                     .frame(width: 52, height: 44)
                     .foregroundStyle(.white.opacity(0.9))
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .buttonRepeatBehavior(.enabled)
             .accessibilityLabel("Canal para cima")
 
             Divider().background(Color.white.opacity(0.12)).frame(width: 34)
@@ -1116,6 +1133,7 @@ struct RemoteView: View {
                 }
                 .foregroundStyle(mutedInk)
                 .frame(width: 52, height: 42)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Guia de canais")
@@ -1130,8 +1148,10 @@ struct RemoteView: View {
                     .font(.system(size: 16, weight: .bold))
                     .frame(width: 52, height: 44)
                     .foregroundStyle(.white.opacity(0.9))
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .buttonRepeatBehavior(.enabled)
             .accessibilityLabel("Canal para baixo")
         }
         .frame(width: 52)
@@ -1696,6 +1716,10 @@ struct RemoteView: View {
                         Text("Configure de acordo com as portas físicas da sua TV.").font(.system(size: 10)).foregroundStyle(mutedInk)
                     }
                 }
+            }
+
+            GlassCard {
+                DiagnosticsCard(store: store)
             }
         }
     }

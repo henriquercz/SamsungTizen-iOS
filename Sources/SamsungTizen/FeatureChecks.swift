@@ -23,7 +23,10 @@ enum FeatureChecks {
         try testCertificateTrustRequiresApprovalAndRejectsChangedPins()
         try testPairingFileIsPrivateAndForgetRemovesIt()
         try testFreshConfigurationHasNoDeviceIdentityAndLoadsCustomParameters()
-        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, private pairing file, fresh configuration and custom parameters.")
+        try testDiagnosticsKeepsLimitAndRedactsTokens()
+        try await testKeyPipelinePreservesOrderUnderBurst()
+        try testAppLauncherCandidateIDsAndDialMapping()
+        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, private pairing file, fresh configuration and custom parameters; diagnostics, key pipeline, and app launcher.")
     }
 
     static func testPackagedResourcesLoadWithoutDeviceConfiguration() throws {
@@ -273,5 +276,30 @@ enum FeatureChecks {
         try truth(metadata.contains("A &lt; B &amp; C"))
         try truth(envelope.contains("&lt;DIDL-Lite"))
         try truth(metadata.contains("http-get:*:video/mp4:DLNA.ORG_OP=01"))
+    }
+    static func testDiagnosticsKeepsLimitAndRedactsTokens() throws {
+        let redacted = Diagnostics.redact("connect?token=SECRET12345&name=iOS")
+        try truth(redacted.contains("token=•••"))
+        try truth(!redacted.contains("SECRET12345"))
+        let jsonRedacted = Diagnostics.redact(#"{"token":"987654321","id":"tv"}"#)
+        try truth(jsonRedacted.contains(#"token":"•••"#))
+        try truth(!jsonRedacted.contains("987654321"))
+    }
+    static func testKeyPipelinePreservesOrderUnderBurst() async throws {
+        let pipeline = KeyPipeline { _ in }
+        await pipeline.enqueue("KEY_VOLUP")
+        await pipeline.enqueue("KEY_VOLDOWN")
+        await pipeline.drained()
+    }
+    static func testAppLauncherCandidateIDsAndDialMapping() throws {
+        let yt = TVApp(id: "111299001912", title: "YouTube", icon: nil)
+        try equal(AppLauncher.dialName(for: yt), "YouTube")
+        let netflix = TVApp(id: "3201907018807", title: "Netflix", icon: nil)
+        try equal(AppLauncher.dialName(for: netflix), "Netflix")
+        let prime = TVApp(id: "3201910019365", title: "Prime Video", icon: nil)
+        try equal(AppLauncher.dialName(for: prime), "AmazonInstantVideo")
+        let candidates = AppLauncher.candidateIDs(for: netflix)
+        try truth(candidates.contains("3201907018807"))
+        try truth(candidates.contains("11101200001"))
     }
 }

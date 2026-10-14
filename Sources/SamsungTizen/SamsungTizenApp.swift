@@ -18,10 +18,17 @@ struct SamsungTizenApp: App {
         }
     }
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             RemoteView(store: store)
                 .preferredColorScheme(.dark)
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active {
+                        store.handleAppForeground()
+                    }
+                }
         }
     }
 }

@@ -194,6 +194,7 @@ private final class PingResult: @unchecked Sendable {
     private var handshake: CheckedContinuation<TizenHandshake, Error>?
     private var earlyHandshake: TizenHandshake?
     private var waiters: [(id: UUID, events: Set<String>, continuation: CheckedContinuation<[String: Any]?, Error>)] = []
+    var isReady: Bool { ready }
     var onPairing: (() -> Void)?
     var onDisconnect: ((Error) -> Void)?
     var onEvent: ((String, String) -> Void)?

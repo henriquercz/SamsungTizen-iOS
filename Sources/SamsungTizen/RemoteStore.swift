@@ -41,6 +41,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     @Published var hdmiCount = max(1, min(4, UserDefaults.standard.object(forKey: "tv.hdmiCount") as? Int ?? 3))
     @Published var inputNames = UserDefaults.standard.dictionary(forKey: "tv.inputNames") as? [String: String] ?? [:]
     @Published var sleepTimerSecondsRemaining: Int? = nil
+    @Published var sleepTimerDeadline: Date? = nil
     private(set) var connection: TizenConnection?
     private var connectTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
@@ -49,6 +50,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     private var volumeEdited = Date.distantPast
     private var iconTask: Task<Void, Never>?
     private var sleepTimerTask: Task<Void, Never>?
+    private var saveEventsTask: Task<Void, Never>?
     private var autoReconnect = false
     private var renderer: UPnPRenderer?
     private let dataDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("br.local.TizenRemote")
@@ -57,6 +59,10 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     private var fileServer: MediaFileServer?
     private var powerActive = false
     private var swipe = SwipePad()
+    private lazy var pipeline = KeyPipeline { [weak self] key in
+        guard let self, let client = self.connection, self.connected else { return }
+        try await client.key(key)
+    }
     init() {
         events = (try? JSONDecoder().decode([RemoteEvent].self, from: Data(contentsOf: dataDirectory.appendingPathComponent("events.json")))) ?? []
         observers.append(NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
@@ -94,12 +100,19 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     }
     var displayForegroundID: String { homeRequested ? "home" : currentAppID ?? currentInput?.id ?? "" }
     func log(_ title: String, _ detail: String) {
+        Diagnostics.shared.record(title, detail)
         events.insert(RemoteEvent(title: title, detail: detail), at: 0)
         if events.count > 200 { events.removeLast(events.count - 200) }
         if title != "Read" {
+            saveEventsTask?.cancel()
             let persisted = events.filter { $0.title != "Read" }
-            do { try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true); try JSONEncoder().encode(persisted).write(to: dataDirectory.appendingPathComponent("events.json"), options: .atomic) }
-            catch { notice = "Não foi possível salvar o histórico local de eventos." }
+            let dir = dataDirectory
+            saveEventsTask = Task.detached(priority: .background) {
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                guard !Task.isCancelled else { return }
+                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                try? JSONEncoder().encode(persisted).write(to: dir.appendingPathComponent("events.json"), options: .atomic)
+            }
         }
     }
 
@@ -274,16 +287,32 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         if before != activity { observeUsage() }
     }
     func perform(_ action: @escaping (TizenConnection) async throws -> Void) {
-        guard connected, let client = connection else { return }
+        guard let client = connection, connected else {
+            if !connecting && !host.isEmpty {
+                notice = "Sem conexão com a TV. Reconectando…"
+                connect(allowFirstUseTrust: false)
+            }
+            return
+        }
         error = nil
         Task { do { try await action(client) } catch { self.error = error.localizedDescription; self.log("Falha no comando", error.localizedDescription) } }
     }
     func press(_ key: String) {
         log("Controle", key)
         changeActivity { $0.pressed(key) }
-        perform { client in
-            try await client.key(key)
-            if ["KEY_VOLUP", "KEY_VOLDOWN", "KEY_MUTE"].contains(key) { try? await Task.sleep(nanoseconds: 350_000_000); await self.refreshVolume() }
+        guard let client = connection, connected else {
+            if !connecting && !host.isEmpty {
+                notice = "Sem conexão com a TV. Reconectando…"
+                connect(allowFirstUseTrust: false)
+            }
+            return
+        }
+        Task {
+            await self.pipeline.enqueue(key)
+            if ["KEY_VOLUP", "KEY_VOLDOWN", "KEY_MUTE"].contains(key) {
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                await self.refreshVolume()
+            }
         }
     }
     func swipePointer(dx: Double, dy: Double) {
@@ -293,8 +322,24 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     func endSwipe() { swipe.end() }
     func launch(_ app: TVApp) {
         log("Abrir aplicativo", app.title)
-        changeActivity { $0.opened(.app(app.id)) }
-        perform { client in try await client.launch(app.id, type: app.type) }
+        notice = "Iniciando \(app.title)…"
+        let launcher = AppLauncher(host: host, connection: connection)
+        Task {
+            let result = await launcher.launch(app)
+            switch result {
+            case .confirmed(let method):
+                self.changeActivity { $0.opened(.app(app.id)) }
+                self.notice = "\(app.title) aberto via \(method.rawValue)."
+                self.log("App Aberto", "\(app.title) via \(method.rawValue)")
+            case .unconfirmed:
+                self.changeActivity { $0.opened(.app(app.id)) }
+                self.notice = "Sinal enviado para \(app.title). Se a TV não abrir, verifique se o app está instalado."
+                self.log("App Nao Confirmado", app.title)
+            case .failed(let reason):
+                self.error = "Não foi possível abrir \(app.title): \(reason)"
+                self.log("Falha ao abrir app", "\(app.title): \(reason)")
+            }
+        }
     }
     func changeVolume(_ value: Double) {
         volume = min(100, max(0, value)); volumeTask?.cancel(); volumeEdited = Date()
@@ -401,18 +446,27 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     func startSleepTimer(minutes: Int) {
         guard minutes > 0 else { return }
         sleepTimerTask?.cancel()
+        let deadline = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        sleepTimerDeadline = deadline
         sleepTimerSecondsRemaining = minutes * 60
         log("Sleep Timer", "Agendado para desligar em \(minutes) minutos")
         notice = "TV desligará em \(minutes) min."
+
+        // Attempt native TV sleep command (KEY_SLEEP) so TV system manager schedules hardware shutdown
+        perform { client in
+            try await client.key("KEY_SLEEP")
+        }
+
         sleepTimerTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 if Task.isCancelled { break }
                 guard let self else { break }
-                guard let remaining = self.sleepTimerSecondsRemaining else { break }
-                let next = remaining - 1
-                if next <= 0 {
+                guard let target = self.sleepTimerDeadline else { break }
+                let remaining = Int(target.timeIntervalSinceNow)
+                if remaining <= 0 {
                     self.sleepTimerSecondsRemaining = nil
+                    self.sleepTimerDeadline = nil
                     self.sleepTimerTask = nil
                     self.log("Sleep Timer", "Tempo esgotado. Desligando TV...")
                     if self.connected {
@@ -427,18 +481,53 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
                     }
                     break
                 } else {
-                    self.sleepTimerSecondsRemaining = next
+                    self.sleepTimerSecondsRemaining = remaining
                 }
             }
         }
     }
     func cancelSleepTimer() {
-        guard sleepTimerTask != nil || sleepTimerSecondsRemaining != nil else { return }
+        guard sleepTimerTask != nil || sleepTimerDeadline != nil || sleepTimerSecondsRemaining != nil else { return }
         sleepTimerTask?.cancel()
         sleepTimerTask = nil
+        sleepTimerDeadline = nil
         sleepTimerSecondsRemaining = nil
         notice = "Timer de desligamento cancelado."
         log("Sleep Timer", "Cancelado pelo usuário")
+    }
+    func handleAppForeground() {
+        if let deadline = sleepTimerDeadline, Date() >= deadline {
+            sleepTimerDeadline = nil
+            sleepTimerSecondsRemaining = nil
+            sleepTimerTask?.cancel()
+            sleepTimerTask = nil
+            log("Sleep Timer", "Prazo atingido durante suspensão. Desligando...")
+            if connected {
+                perform { client in
+                    try await client.key("KEY_POWER")
+                    self.disconnect()
+                    self.notice = "TV desligada pelo timer."
+                }
+            } else {
+                disconnect()
+                notice = "TV desligada pelo timer."
+            }
+            return
+        }
+
+        if autoReconnect, !connecting {
+            Task {
+                if let client = connection, connected {
+                    do {
+                        try await client.checkAlive()
+                    } catch {
+                        connect(allowFirstUseTrust: false)
+                    }
+                } else if !host.isEmpty {
+                    connect(allowFirstUseTrust: false)
+                }
+            }
+        }
     }
     func forgetPairing() {
         guard !host.isEmpty else { return }
