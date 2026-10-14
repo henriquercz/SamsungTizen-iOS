@@ -370,8 +370,16 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
             log("Remote", "KEY_POWER")
             perform { client in try await client.key("KEY_POWER"); self.disconnect(); self.notice = "TV turned off." }
         } else {
-            do { try TVDiscovery.wake(mac: mac, host: host); notice = "Wake signal sent. If the TV stays off, turn on Power On with Mobile in its network settings." }
-            catch { self.error = error.localizedDescription }
+            do {
+                try TVDiscovery.wake(mac: mac, host: host)
+                notice = "Sinal de inicialização (Wake-on-LAN) enviado. Conectando..."
+                Task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    self.connect()
+                }
+            } catch {
+                self.error = error.localizedDescription
+            }
         }
     }
     func forgetPairing() {

@@ -45,8 +45,10 @@ struct TVInfo: Equatable {
               let device = object["device"] as? [String: Any] else { return nil }
         func text(_ key: String) -> String { (device[key] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
         let firmware = text("firmwareVersion")
+        let macCandidates = [text("wifiMac"), text("mac"), text("wiredMac")]
+        let resolvedMac = macCandidates.first(where: { !$0.isEmpty }) ?? ""
         return TVInfo(name: text("name").isEmpty ? object["name"] as? String ?? "" : text("name"), modelName: text("modelName"), modelCode: text("model"),
-                      wifiMac: text("wifiMac"), powerState: text("PowerState"), os: text("OS"),
+                      wifiMac: resolvedMac, powerState: text("PowerState"), os: text("OS"),
                       firmware: firmware.lowercased() == "unknown" ? "" : firmware, type: text("type"))
     }
     static func fetch(host: String, timeout: TimeInterval = 4) async throws -> TVInfo {
@@ -118,20 +120,67 @@ enum TVDiscovery {
         }
         return devices.sorted { $0.name < $1.name }
     }
+    static func parseMAC(_ mac: String) -> [UInt8]? {
+        let hex = mac.filter { $0.isHexDigit }
+        guard hex.count == 12 else { return nil }
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(6)
+        var index = hex.startIndex
+        for _ in 0..<6 {
+            let nextIndex = hex.index(index, offsetBy: 2)
+            guard let byte = UInt8(hex[index..<nextIndex], radix: 16) else { return nil }
+            bytes.append(byte)
+            index = nextIndex
+        }
+        return bytes
+    }
+
+    static func subnetBroadcastAddress(for host: String) -> String {
+        let parts = host.split(separator: ".")
+        guard parts.count == 4 else { return "255.255.255.255" }
+        return parts[0...2].joined(separator: ".") + ".255"
+    }
+
     static func wake(mac: String, host: String) throws {
         guard TizenConnection.localHost(host) else { throw RemoteError.message("Enter the TV's local IPv4 address.") }
-        let parts = mac.split(separator: ":", omittingEmptySubsequences: false)
-        let bytes = parts.compactMap { UInt8($0, radix: 16) }
-        guard parts.count == 6, parts.allSatisfy({ $0.count == 2 }), bytes.count == 6 else { throw RemoteError.message("Invalid MAC address.") }
-        let fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); guard fd >= 0 else { throw RemoteError.message("Could not send the wake signal.") }
+        guard let bytes = parseMAC(mac) else { throw RemoteError.message("Invalid MAC address.") }
+        let fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+        guard fd >= 0 else { throw RemoteError.message("Could not send the wake signal.") }
         defer { Darwin.close(fd) }
-        var yes: Int32 = 1; setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &yes, socklen_t(MemoryLayout<Int32>.size))
+        var yes: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &yes, socklen_t(MemoryLayout<Int32>.size))
         let packet = [UInt8](repeating: 255, count: 6) + Array(repeating: bytes, count: 16).flatMap { $0 }
-        for target in [host, "255.255.255.255"] {
-            var address = sockaddr_in(); address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size); address.sin_family = sa_family_t(AF_INET); address.sin_port = UInt16(9).bigEndian
-            inet_pton(AF_INET, target, &address.sin_addr)
-            let sent = packet.withUnsafeBytes { buffer in withUnsafePointer(to: &address) { ptr in ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sendto(fd, buffer.baseAddress, packet.count, 0, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) } } }
-            if sent < 0 { throw RemoteError.message("Could not send Wake-on-LAN.") }
+        let subnetBroadcast = subnetBroadcastAddress(for: host)
+        var targets = [host, "255.255.255.255"]
+        if !targets.contains(subnetBroadcast) {
+            targets.append(subnetBroadcast)
         }
+        let ports: [UInt16] = [9, 7]
+        var anySent = false
+        for burst in 0..<3 {
+            if burst > 0 {
+                usleep(25_000)
+            }
+            for target in targets {
+                for port in ports {
+                    var address = sockaddr_in()
+                    address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+                    address.sin_family = sa_family_t(AF_INET)
+                    address.sin_port = port.bigEndian
+                    inet_pton(AF_INET, target, &address.sin_addr)
+                    let sent = packet.withUnsafeBytes { buffer in
+                        withUnsafePointer(to: &address) { ptr in
+                            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                                sendto(fd, buffer.baseAddress, packet.count, 0, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                            }
+                        }
+                    }
+                    if sent >= 0 {
+                        anySent = true
+                    }
+                }
+            }
+        }
+        guard anySent else { throw RemoteError.message("Could not send Wake-on-LAN.") }
     }
 }
