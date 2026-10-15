@@ -23,16 +23,21 @@ def main():
         except Exception as e:
             print(f"Warning: Failed to parse existing Info.plist: {e}")
 
-    source_plist = "Sources/SamsungTizen/Info.plist"
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    source_plist = os.path.join(repo_root, "Sources", "SamsungTizen", "Info.plist")
+    if not os.path.exists(source_plist):
+        source_plist = "Sources/SamsungTizen/Info.plist"
+
     if os.path.exists(source_plist):
         try:
             with open(source_plist, "rb") as f:
                 source = plistlib.load(f)
                 current.update(source)
+                print(f"Loaded {len(source)} keys from source Info.plist")
         except Exception as e:
             print(f"Warning: Failed to load source Info.plist: {e}")
 
-    # Ensure required fullscreen, identity, and branding keys are explicitly present
+    # Ensure required fullscreen, identity, background modes, and branding keys are explicitly present
     current["CFBundleIdentifier"] = "br.local.SamsungTizen"
     current["CFBundleExecutable"] = "Samsung Remote"
     current["CFBundleName"] = "Samsung Remote"
@@ -40,6 +45,9 @@ def main():
     current["CFBundleDevelopmentRegion"] = "pt-BR"
     current["UILaunchStoryboardName"] = "LaunchScreen"
     current["UILaunchScreen"] = {}
+    current["UIBackgroundModes"] = ["audio"]
+    current["NSLocalNetworkUsageDescription"] = "Este aplicativo requer acesso à sua rede local Wi-Fi para descobrir, conectar e controlar sua Smart TV Samsung."
+    current["NSBonjourServices"] = ["_dial._tcp", "_mediarenderer._tcp"]
 
     with open(plist_path, "wb") as f:
         plistlib.dump(current, f)
