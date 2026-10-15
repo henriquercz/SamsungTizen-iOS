@@ -36,7 +36,11 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     @Published var casting = false
     @Published var mediaStatus = "Escolha um arquivo de vídeo, áudio ou imagem."
     @Published var preferredPanelHeight: CGFloat = 740
-    @Published var favorites = Set(UserDefaults.standard.stringArray(forKey: "tv.favorites") ?? [])
+    @Published var favoriteAppIDs: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "tv.favorites") ?? ["111299001912", "3201907018807", "3201910019365"])
+    var favorites: Set<String> {
+        get { favoriteAppIDs }
+        set { favoriteAppIDs = newValue }
+    }
     @Published var hiddenApps = Set(UserDefaults.standard.stringArray(forKey: "tv.hiddenApps") ?? [])
     @Published var hdmiCount = max(1, min(4, UserDefaults.standard.object(forKey: "tv.hdmiCount") as? Int ?? 3))
     @Published var inputNames = UserDefaults.standard.dictionary(forKey: "tv.inputNames") as? [String: String] ?? [:]
@@ -64,6 +68,8 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
         try await client.key(key)
     }
     init() {
+        let savedFavorites = UserDefaults.standard.stringArray(forKey: "tv.favorites")
+        self.favoriteAppIDs = Set(savedFavorites ?? ["111299001912", "3201907018807", "3201910019365"]) // Defaults: YouTube, Netflix, Prime Video
         events = (try? JSONDecoder().decode([RemoteEvent].self, from: Data(contentsOf: dataDirectory.appendingPathComponent("events.json")))) ?? []
         observers.append(NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.pauseUsage() }
@@ -82,7 +88,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
             return String(format: "%02d:%02d", m, s)
         }
     }
-    var pinnedApps: [TVApp] { shortcuts.filter { favorites.contains($0.id) } }
+    var pinnedApps: [TVApp] { shortcuts.filter { favoriteAppIDs.contains($0.id) } }
     var homeRequested: Bool { activity.homeShown }
     var inputs: [TVInput] {
         (1...hdmiCount).map { number in
@@ -126,7 +132,7 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     var shortcuts: [TVApp] {
         let preferred = ["netflix", "youtube", "prime video", "disney", "globoplay", "spotify", "max", "apple"]
         return apps.filter { !hiddenApps.contains($0.id) }.sorted { a, b in
-            if favorites.contains(a.id) != favorites.contains(b.id) { return favorites.contains(a.id) }
+            if favoriteAppIDs.contains(a.id) != favoriteAppIDs.contains(b.id) { return favoriteAppIDs.contains(a.id) }
             let ai = preferred.firstIndex { a.title.localizedCaseInsensitiveContains($0) } ?? 100
             let bi = preferred.firstIndex { b.title.localizedCaseInsensitiveContains($0) } ?? 100
             return ai != bi ? ai < bi : a.title.localizedStandardCompare(b.title) == .orderedAscending
@@ -373,14 +379,27 @@ struct RemoteEvent: Identifiable, Codable { let id: UUID; let date: Date; let ti
     func sendText(_ text: String) { guard !text.isEmpty else { return }; perform { try await $0.sendText(text) } }
     func enterText() { perform { try await $0.finishText() } }
     func setHidden(_ app: TVApp, _ hidden: Bool) {
-        if hidden { hiddenApps.insert(app.id); favorites.remove(app.id); UserDefaults.standard.set(Array(favorites), forKey: "tv.favorites") }
+        if hidden { hiddenApps.insert(app.id); favoriteAppIDs.remove(app.id); UserDefaults.standard.set(Array(favoriteAppIDs), forKey: "tv.favorites") }
         else { hiddenApps.remove(app.id) }
         UserDefaults.standard.set(Array(hiddenApps), forKey: "tv.hiddenApps")
     }
     func showHiddenApps() { hiddenApps.removeAll(); UserDefaults.standard.removeObject(forKey: "tv.hiddenApps") }
+    func toggleFavorite(_ appID: String) {
+        if favoriteAppIDs.contains(appID) {
+            favoriteAppIDs.remove(appID)
+        } else {
+            favoriteAppIDs.insert(appID)
+        }
+        UserDefaults.standard.set(Array(favoriteAppIDs), forKey: "tv.favorites")
+    }
     func toggleFavorite(_ app: TVApp) {
-        if favorites.contains(app.id) { favorites.remove(app.id) } else { favorites.insert(app.id) }
-        UserDefaults.standard.set(Array(favorites), forKey: "tv.favorites")
+        toggleFavorite(app.id)
+    }
+    func isFavorite(_ appID: String) -> Bool {
+        favoriteAppIDs.contains(appID)
+    }
+    var favoriteApps: [TVApp] {
+        apps.filter { isFavorite($0.id) }
     }
     private func saveUsage() {
         do { try journal.save() } catch { notice = "Não foi possível salvar o histórico de uso." }

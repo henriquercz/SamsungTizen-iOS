@@ -31,7 +31,8 @@ enum FeatureChecks {
         try testKeychainPairingRoundtrip()
         try await testBackgroundAudioTimerLifecycle()
         try testRemoteMetricsValues()
-        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, private pairing file, fresh configuration and custom parameters; diagnostics, key pipeline, app launcher, smart device HDMI recognition, iOS Keychain security, background audio timer, and remote touch metrics.")
+        try await testFavoritesPersistenceAndSorting()
+        print("PASS: packaged catalog and images; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416 with DLNA headers; XML escaping and renderer parsing; Smart View key, text, launch and channel frames; pairing token and refusal handshakes; installed app list; TV description; catalog name matching; local activity tracking; swipe pad; local IPv4 boundaries, certificate trust, private pairing file, fresh configuration and custom parameters; diagnostics, key pipeline, app launcher, smart device HDMI recognition, iOS Keychain security, background audio timer, remote touch metrics, and favorite apps pinning/sorting.")
     }
 
     static func testPackagedResourcesLoadWithoutDeviceConfiguration() throws {
@@ -395,5 +396,65 @@ enum FeatureChecks {
         try equal(custom.rockerHeight, 130)
         try equal(custom.navButtonHeight, 44)
         try equal(custom.touchTargetPadding, 10)
+    }
+
+    @MainActor
+    static func testFavoritesPersistenceAndSorting() throws {
+        let originalFavorites = UserDefaults.standard.stringArray(forKey: "tv.favorites")
+        defer {
+            if let original = originalFavorites {
+                UserDefaults.standard.set(original, forKey: "tv.favorites")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "tv.favorites")
+            }
+        }
+
+        // 1. Defaults verification when none stored in UserDefaults
+        UserDefaults.standard.removeObject(forKey: "tv.favorites")
+        let store = RemoteStore()
+        try truth(store.isFavorite("111299001912")) // YouTube
+        try truth(store.isFavorite("3201907018807")) // Netflix
+        try truth(store.isFavorite("3201910019365")) // Prime Video
+        try truth(!store.isFavorite("org.tizen.browser"))
+
+        // 2. Toggle favorite on (add)
+        store.toggleFavorite("org.tizen.browser")
+        try truth(store.isFavorite("org.tizen.browser"))
+        try truth(store.favoriteAppIDs.contains("org.tizen.browser"))
+        let savedWithBrowser = UserDefaults.standard.stringArray(forKey: "tv.favorites") ?? []
+        try truth(savedWithBrowser.contains("org.tizen.browser"))
+
+        // 3. Toggle favorite off (remove)
+        store.toggleFavorite("org.tizen.browser")
+        try truth(!store.isFavorite("org.tizen.browser"))
+        try truth(!store.favoriteAppIDs.contains("org.tizen.browser"))
+        let savedWithoutBrowser = UserDefaults.standard.stringArray(forKey: "tv.favorites") ?? []
+        try truth(!savedWithoutBrowser.contains("org.tizen.browser"))
+
+        // 4. favoriteApps filtering
+        let yt = TVApp(id: "111299001912", title: "YouTube", icon: nil)
+        let nflx = TVApp(id: "3201907018807", title: "Netflix", icon: nil)
+        let other = TVApp(id: "com.other.app", title: "Other", icon: nil)
+        store.apps = [yt, other, nflx]
+
+        let favApps = store.favoriteApps
+        try equal(favApps.count, 2)
+        try truth(favApps.contains(yt))
+        try truth(favApps.contains(nflx))
+        try truth(!favApps.contains(other))
+
+        // 5. Smart ordering in shortcuts puts favorites ahead of non-favorites
+        let shortcuts = store.shortcuts
+        let ytIndex = shortcuts.firstIndex(of: yt)!
+        let otherIndex = shortcuts.firstIndex(of: other)!
+        try truth(ytIndex < otherIndex)
+
+        // 6. TVApp toggle overload
+        store.toggleFavorite(yt)
+        try truth(!store.isFavorite(yt.id))
+        try truth(!store.favoriteApps.contains(yt))
+        store.toggleFavorite(yt)
+        try truth(store.isFavorite(yt.id))
+        try truth(store.favoriteApps.contains(yt))
     }
 }

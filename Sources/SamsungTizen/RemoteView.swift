@@ -1278,6 +1278,65 @@ struct RemoteView: View {
                     .foregroundStyle(mutedInk)
             }
 
+            if search.isEmpty && !store.favoriteApps.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Label("Favoritos", systemImage: "star.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color.yellow)
+                        Spacer()
+                        Text("\(store.favoriteApps.count)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(mutedInk)
+                    }
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(store.favoriteApps) { app in
+                                let color = BrandTheme.forApp(app.id, title: app.title, icon: AppIcons.url(for: app)).color
+
+                                Button {
+                                    Haptic.press()
+                                    store.launch(app)
+                                } label: {
+                                    VStack(spacing: 6) {
+                                        ZStack(alignment: .topTrailing) {
+                                            AppMark(app: app, size: 48)
+                                                .shadow(color: color.opacity(0.24), radius: 8)
+                                            Image(systemName: "star.fill")
+                                                .font(.system(size: 8))
+                                                .foregroundStyle(Color.yellow)
+                                                .padding(3)
+                                                .background(.black.opacity(0.6), in: Circle())
+                                                .offset(x: 3, y: -3)
+                                        }
+                                        Text(app.title)
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundStyle(.white.opacity(0.9))
+                                            .lineLimit(1)
+                                            .frame(width: 64)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(!store.connected)
+                                .contextMenu {
+                                    Button("Abrir na TV") { store.launch(app) }
+                                    Button("Remover dos favoritos") {
+                                        Haptic.tap()
+                                        store.toggleFavorite(app.id)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.vertical, 2)
+                        .padding(.horizontal, 2)
+                    }
+                }
+                .padding(12)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.yellow.opacity(0.25), lineWidth: 0.8))
+            }
+
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(mutedInk)
                 TextField("Buscar aplicativos...", text: $search)
@@ -1308,7 +1367,7 @@ struct RemoteView: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 14) {
                     ForEach(filtered) { app in
                         let color = BrandTheme.forApp(app.id, title: app.title, icon: AppIcons.url(for: app)).color
-                        let isFav = store.favorites.contains(app.id)
+                        let isFav = store.isFavorite(app.id)
                         let isActive = store.displayForegroundID == app.id
 
                         VStack(spacing: 8) {
@@ -1316,11 +1375,11 @@ struct RemoteView: View {
                                 Spacer()
                                 Button {
                                     Haptic.tap()
-                                    store.toggleFavorite(app)
+                                    store.toggleFavorite(app.id)
                                 } label: {
                                     Image(systemName: isFav ? "star.fill" : "star")
                                         .font(.system(size: 11))
-                                        .foregroundStyle(isFav ? color : mutedInk)
+                                        .foregroundStyle(isFav ? Color.yellow : mutedInk)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -1360,7 +1419,10 @@ struct RemoteView: View {
                         )
                         .contextMenu {
                             Button("Abrir na TV") { store.launch(app) }
-                            Button(isFav ? "Remover dos favoritos" : "Adicionar aos favoritos") { store.toggleFavorite(app) }
+                            Button(isFav ? "Remover dos favoritos" : "Adicionar aos favoritos") {
+                                Haptic.tap()
+                                store.toggleFavorite(app.id)
+                            }
                             Button("Ocultar da lista") { store.setHidden(app, true) }
                         }
                     }
